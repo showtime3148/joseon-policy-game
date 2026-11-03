@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>조선 국정 회의 순위판</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* layout: 교실 화면용 순위판 — 큰 글씨, 모둠별 한 줄 */
+:root{ --paper:#efe5cf; --card:#fbf6ea; --ink:#2a211a; --muted:#6c5f4f; --line:#d6c5a3; --red:#a3352a; --navy:#24384c; --gold:#a97c25; --jade:#2f6b5e; --bad:#b0392d;
+  --display:'Nanum Myeongjo','Batang',serif; --body:'Noto Sans KR','Malgun Gothic',sans-serif; color-scheme:light; }
+*{box-sizing:border-box} html,body{margin:0}
+body{background:var(--paper); color:var(--ink); font-family:var(--body); background-image:radial-gradient(rgba(120,90,40,.06) 1px, transparent 1px); background-size:7px 7px}
+header{background:var(--navy); color:#f5ecd8; border-bottom:4px solid var(--red)}
+.in{max-width:1300px; margin:0 auto; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap}
+h1{font-family:var(--display); font-weight:800; font-size:24px; margin:0}
+main{max-width:1300px; margin:0 auto; padding:18px 16px 40px}
+.ctl{display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:14px}
+select{font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:5px; background:#fffdf7}
+.note{background:#f4e6c4; border-radius:6px; padding:10px 14px; margin-bottom:14px; font-size:14px}
+.group{margin-bottom:22px}
+.group h2{font-family:var(--display); font-size:21px; margin:0 0 8px}
+.rows{display:flex; flex-direction:column; gap:8px}
+.r{display:grid; grid-template-columns:54px 1.3fr 90px 1.6fr 1fr 80px; gap:14px; align-items:center; background:var(--card); border:1px solid var(--line); border-radius:6px; padding:10px 14px}
+.rk{font-family:var(--display); font-size:28px; font-weight:800; color:var(--muted); text-align:center}
+.r:nth-child(1) .rk{color:var(--gold)} .r:nth-child(2) .rk{color:#7d8a96} .r:nth-child(3) .rk{color:#9a6a3c}
+.tm b{font-size:19px} .tm div{font-size:12.5px; color:var(--muted)}
+.prog{font-size:13px; color:var(--muted)} .prog b{color:var(--ink); font-size:16px}
+.bars{display:grid; grid-template-columns:repeat(6,1fr); gap:6px}
+.b{font-size:11px; color:var(--muted); text-align:center}
+.b i{display:block; height:34px; background:#e6dabf; border-radius:3px; position:relative; overflow:hidden; margin-bottom:2px}
+.b i s{position:absolute; left:0; right:0; bottom:0; background:var(--navy)} .b i s.lo{background:var(--bad)}
+.ach{font-size:12.5px; color:var(--jade)}
+.sc{font-family:var(--display); font-size:34px; font-weight:800; color:var(--red); text-align:right; font-variant-numeric:tabular-nums}
+.done{display:inline-block; font-size:11px; font-weight:700; color:#fff; background:var(--jade); border-radius:3px; padding:0 6px; margin-left:6px; vertical-align:middle}
+@media (max-width:860px){ .r{grid-template-columns:40px 1fr 70px; } .bars,.ach{grid-column:1 / -1} .prog{text-align:right} }
+</style>
+</head>
+<body>
+<header><div class="in"><h1>朝鮮 國政 會議 · 모둠 순위판</h1>
+  <div class="ctl"><label for="fc">학급</label><select id="fc"><option value="">전체</option></select>
+  <label for="fk">왕</label><select id="fk"><option value="">전체</option></select>
+  <span id="upd">불러오는 중…</span></div></div></header>
+<main><div id="msg"></div><div id="list"></div></main>
+<script src="config.js"></script>
+<script>
+const SN={tr:'국고',pp:'민심',cr:'왕권',df:'국방',lv:'민생',cu:'문화'};
+const SAMPLE=[
+ {cls:'예시',team:'집현전',members:'3명',king:'세종',turn:5,total:7,tr:48,pp:66,cr:62,df:58,lv:63,cu:78,ach:'집현전, 농사직설, 공법',crises:0,score:64,finished:false},
+ {cls:'예시',team:'대동',members:'4명',king:'세종',turn:7,total:7,tr:55,pp:60,cr:70,df:45,lv:58,cu:62,ach:'과학 기구',crises:0,score:58,finished:true},
+ {cls:'예시',team:'중립외교',members:'4명',king:'광해군',turn:4,total:7,tr:32,pp:44,cr:46,df:38,lv:41,cu:48,ach:'대동법, 동의보감',crises:0,score:44,finished:false}];
+let rows=[];
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fill(sel, vals){ const cur=sel.value; sel.innerHTML='<option value="">전체</option>'+vals.map(x=>`<option ${x===cur?'selected':''}>${esc(x)}</option>`).join(''); }
+function draw(){
+  const fc=document.getElementById('fc'), fk=document.getElementById('fk');
+  fill(fc,[...new Set(rows.map(r=>String(r.cls)))].sort()); fill(fk,[...new Set(rows.map(r=>r.king))]);
+  const list=rows.filter(r=>(!fc.value||String(r.cls)===fc.value)&&(!fk.value||r.king===fk.value));
+  const kings=[...new Set(list.map(r=>r.king))];
+  document.getElementById('list').innerHTML = kings.length ? kings.map(k=>{
+    const g=list.filter(r=>r.king===k).sort((a,b)=>b.score-a.score);
+    return `<section class="group"><h2>${esc(k)} 시대 · ${g.length}개 모둠</h2><div class="rows">${g.map((r,i)=>`
+      <div class="r"><div class="rk">${i+1}</div>
+        <div class="tm"><b>${esc(r.team)}</b>${r.finished?'<span class="done">완료</span>':''}<div>${esc(r.cls)} · ${esc(r.members)}</div></div>
+        <div class="prog">사건 <b>${r.turn}</b>/${r.total}${+r.crises?`<div style="color:var(--bad)">위기 ${r.crises}회</div>`:''}</div>
+        <div class="bars">${Object.keys(SN).map(s=>`<div class="b"><i><s class="${r[s]<20?'lo':''}" style="height:${Math.max(0,Math.min(100,r[s]))}%"></s></i>${SN[s]}</div>`).join('')}</div>
+        <div class="ach">${r.ach?'업적: '+esc(r.ach):''}</div>
+        <div class="sc">${r.score}</div></div>`).join('')}</div></section>`; }).join('') : '<p>아직 참여한 모둠이 없습니다.</p>';
+}
+function load(){
+  if(!SHEET_URL){ document.getElementById('msg').innerHTML='<div class="note">구글 시트가 연결되지 않아 <b>예시 데이터</b>를 보여 주고 있습니다. config.js에 Apps Script 주소를 넣으면 실제 모둠 순위가 표시됩니다.</div>'; rows=SAMPLE; document.getElementById('upd').textContent='예시'; draw(); return; }
+  fetch(SHEET_URL+'?action=board&t='+Date.now()).then(r=>r.json()).then(j=>{ rows=(j.rows||[]); document.getElementById('msg').innerHTML=''; document.getElementById('upd').textContent='갱신 '+new Date().toLocaleTimeString('ko-KR'); draw(); })
+    .catch(()=>{ document.getElementById('upd').textContent='불러오기 실패, 다시 시도 중'; });
+}
+document.getElementById('fc').addEventListener('change', draw);
+document.getElementById('fk').addEventListener('change', draw);
+load(); setInterval(load, 10000);
+</script>
+</body>
+</html>

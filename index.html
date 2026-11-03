@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>조선 국정 회의</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* layout: 한지 바탕 위 좌측 국정 지표판 + 중앙 사건 두루마리 + 우측 어명 패널 */
+:root{
+  --paper:#efe5cf; --card:#fbf6ea; --ink:#2a211a; --muted:#6c5f4f; --line:#d6c5a3;
+  --red:#a3352a; --red-soft:#f3dcd4; --navy:#24384c; --jade:#2f6b5e; --jade-soft:#dcebe4; --gold:#a97c25; --gold-soft:#f4e6c4;
+  --good:#2c7a4c; --bad:#b0392d;
+  --display:'Nanum Myeongjo','Batang',serif; --body:'Noto Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper); color:var(--ink); font-family:var(--body); font-size:15px; line-height:1.6;
+  background-image:radial-gradient(rgba(120,90,40,.06) 1px, transparent 1px); background-size:7px 7px}
+h1,h2,h3{font-family:var(--display); font-weight:800; margin:0; line-height:1.3; text-wrap:balance}
+button,input,textarea,select{font:inherit; color:inherit}
+:focus-visible{outline:2px solid var(--red); outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+.top{background:var(--navy); color:#f5ecd8; border-bottom:4px solid var(--red)}
+.top-in{max-width:1240px; margin:0 auto; padding:10px 16px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap}
+.top b{font-family:var(--display); font-size:20px; letter-spacing:.04em}
+.top span{font-size:13px; opacity:.85}
+main{max-width:1240px; margin:0 auto; padding:20px 16px 60px}
+.card{background:var(--card); border:1px solid var(--line); border-radius:6px; padding:18px; box-shadow:0 1px 0 rgba(80,60,30,.08)}
+.stack{display:flex; flex-direction:column; gap:16px}
+.row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+.muted{color:var(--muted)} .small{font-size:13px}
+.eyebrow{font-size:12px; letter-spacing:.12em; color:var(--red); font-weight:700}
+.btn{border:1px solid var(--line); background:var(--card); border-radius:5px; padding:9px 16px; cursor:pointer; font-weight:500}
+.btn:hover{border-color:var(--red)}
+.btn.primary{background:var(--red); border-color:var(--red); color:#fbf3e4; font-weight:700}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.big{padding:13px 22px; font-size:16px}
+.btn:disabled{opacity:.45; cursor:not-allowed}
+label.f{display:flex; flex-direction:column; gap:6px; font-weight:500; font-size:14px}
+input[type=text],textarea{width:100%; border:1px solid var(--line); background:#fffdf7; border-radius:5px; padding:9px 11px}
+textarea{min-height:90px; resize:vertical}
+.hint{font-size:12.5px; color:var(--muted); font-weight:400}
+.err{color:var(--bad); font-size:13px; min-height:1em}
+.seal{display:inline-grid; place-items:center; width:34px; height:34px; border-radius:6px; background:var(--red); color:#fbf3e4; font-family:var(--display); font-weight:800; font-size:18px; flex:none}
+.pill{display:inline-flex; gap:4px; align-items:center; font-size:12px; font-weight:700; padding:2px 9px; border-radius:99px; background:var(--gold-soft); color:var(--gold); white-space:nowrap}
+.pill.good{background:var(--jade-soft); color:var(--good)} .pill.bad{background:var(--red-soft); color:var(--bad)}
+
+/* start */
+.hero{display:grid; grid-template-columns:1.3fr 1fr; gap:16px}
+.hero h1{font-size:32px; margin:4px 0 10px}
+.hero p{margin:0 0 8px; max-width:62ch}
+.kings{display:grid; grid-template-columns:repeat(5,1fr); gap:12px}
+.king{display:flex; flex-direction:column; gap:6px; text-align:left; cursor:pointer; background:var(--card); border:1.5px solid var(--line); border-radius:6px; padding:14px; border-top:5px solid var(--navy)}
+.king:hover{border-color:var(--red)}
+.king[aria-pressed="true"]{border-color:var(--red); border-top-color:var(--red); box-shadow:0 0 0 3px var(--red-soft)}
+.king h3{font-size:22px}
+.king .reign{font-size:12px; color:var(--muted)}
+.king .tt{font-weight:700; font-size:14px}
+.king p{margin:0; font-size:13px; color:var(--muted); line-height:1.5}
+details.guide summary{cursor:pointer; font-weight:700}
+details.guide li{margin:3px 0}
+
+/* gauges */
+.gauges{display:flex; flex-direction:column; gap:10px}
+.gauge{display:grid; grid-template-columns:34px 1fr; gap:10px; align-items:center}
+.gauge .top2{display:flex; justify-content:space-between; align-items:baseline; font-size:13.5px}
+.gauge .top2 b{font-size:14px}
+.gauge .v{font-weight:700; font-variant-numeric:tabular-nums}
+.bar{position:relative; height:12px; background:#e6dabf; border-radius:3px; overflow:hidden}
+.bar i{position:absolute; left:0; top:0; bottom:0; background:var(--navy); border-radius:3px; transition:width .5s}
+.bar i.lo{background:var(--bad)}
+.bar em{position:absolute; top:0; bottom:0; background:repeating-linear-gradient(45deg, var(--gold) 0 3px, transparent 3px 6px); opacity:.8}
+.bar .danger{position:absolute; left:20%; top:-2px; bottom:-2px; border-left:1.5px dashed var(--bad); opacity:.6}
+.pv{font-size:12px; font-weight:700; margin-left:6px; font-variant-numeric:tabular-nums}
+.up{color:var(--good)} .dn{color:var(--bad)} .z{color:var(--muted)}
+
+/* turn */
+.board{display:grid; grid-template-columns:290px 1fr 330px; gap:16px; align-items:start}
+.banner{display:flex; justify-content:space-between; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:14px}
+.banner h2{font-size:26px}
+.yr{font-family:var(--display); font-size:15px; color:var(--red); font-weight:800}
+.steps{display:flex; gap:4px}
+.steps i{width:26px; height:8px; background:var(--line); border-radius:2px}
+.steps i.d{background:var(--navy)} .steps i.n{background:var(--red)}
+.scroll{background:var(--card); border:1px solid var(--line); border-radius:6px; padding:20px 22px; position:relative; border-left:6px solid var(--red)}
+.scroll h3{font-size:24px; margin-bottom:8px}
+.scroll p{margin:0; font-size:16px; line-height:1.75; max-width:60ch}
+.war{display:inline-block; margin-bottom:8px}
+.choices{display:flex; flex-direction:column; gap:10px; margin-top:14px}
+.ch{display:flex; flex-direction:column; gap:6px; text-align:left; cursor:pointer; background:#fffdf7; border:1.5px solid var(--line); border-radius:6px; padding:12px 14px}
+.ch:hover{border-color:var(--red)}
+.ch[aria-pressed="true"]{border-color:var(--red); background:var(--red-soft); box-shadow:inset 4px 0 0 var(--red)}
+.ch b{font-size:16px}
+.ch span{font-size:13.5px; color:var(--muted)}
+.tags{display:flex; gap:6px; flex-wrap:wrap}
+.tag{font-size:12px; font-weight:700; padding:1px 8px; border-radius:4px; background:#efe6d0}
+.tag.up{background:var(--jade-soft)} .tag.dn{background:var(--red-soft)}
+.panel{display:flex; flex-direction:column; gap:16px}
+.sl{display:flex; flex-direction:column; gap:3px}
+.sl .h{display:flex; justify-content:space-between; align-items:baseline}
+.sl .h b{font-size:14px}
+.sl .h span{font-weight:700; color:var(--red); font-variant-numeric:tabular-nums}
+.sl input[type=range]{width:100%; accent-color:var(--red); height:26px; margin:0; cursor:grab}
+.ticks{display:flex; justify-content:space-between; font-size:11px; color:var(--muted)}
+.budget{display:flex; height:16px; border-radius:3px; overflow:hidden; border:1px solid var(--line)}
+.budget i{display:block; height:100%; transition:width .2s}
+
+/* result */
+.sillok{max-width:860px; margin:0 auto}
+.sillok .rec{font-family:var(--display); font-size:21px; line-height:1.7; border-left:6px solid var(--red); padding-left:16px; margin:10px 0}
+.deltas{display:grid; grid-template-columns:repeat(6,1fr); gap:8px}
+.dl{background:#fffdf7; border:1px solid var(--line); border-radius:6px; padding:8px; text-align:center}
+.dl .k{font-size:12px; color:var(--muted)} .dl .n{font-size:22px; font-weight:700; font-variant-numeric:tabular-nums}
+.note{padding:9px 12px; border-radius:5px; background:var(--gold-soft); font-size:14px}
+.note.crisis{background:var(--red-soft); color:var(--bad); font-weight:700}
+.note.war{background:#e4e8ee}
+.ach{display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border:2px solid var(--gold); border-radius:6px; background:var(--gold-soft); font-family:var(--display); font-weight:800; font-size:17px; color:#6e4f12}
+.real{background:var(--jade-soft); border-radius:6px; padding:12px 14px; font-size:14.5px}
+.real b{color:var(--jade)}
+
+/* end/report */
+.score{font-family:var(--display); font-size:56px; font-weight:800; color:var(--red); line-height:1}
+.badges{display:flex; flex-wrap:wrap; gap:8px}
+table.t{width:100%; border-collapse:collapse; font-size:13.5px}
+table.t th,table.t td{border-bottom:1px solid var(--line); padding:7px 6px; text-align:left; vertical-align:top}
+table.t th{font-size:12px; color:var(--muted); white-space:nowrap}
+.tw{overflow-x:auto}
+.qa{border-left:3px solid var(--line); padding-left:12px} .qa h3{font-size:14px; font-family:var(--body); color:var(--muted)} .qa p{margin:2px 0 0; white-space:pre-wrap}
+.copybox{width:100%; min-height:150px; font-size:12px}
+
+@media (max-width:1100px){ .board{grid-template-columns:260px 1fr} .board .panel{grid-column:1 / -1} .kings{grid-template-columns:repeat(3,1fr)} }
+@media (max-width:760px){ .board,.hero{grid-template-columns:1fr} .kings{grid-template-columns:1fr 1fr} .deltas{grid-template-columns:repeat(3,1fr)} .hero h1{font-size:25px} }
+@media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in"><div><b>朝鮮 國政 會議</b> <span>조선 국정 회의 · 모둠 대항 정책 시뮬레이션</span></div><span id="who"></span></div></header>
+<main id="app"></main>
+<script src="config.js"></script>
+<script src="scenarios.js"></script>
+<script src="core.js"></script>
+<script>
+const KEY='joseon-policy-game-v1', MIN_WHY=30, MIN_GOAL=20, MIN_REF=40;
+const $app=document.getElementById('app');
+const BUD_COLORS={df:'#24384c', lv:'#2f6b5e', cu:'#a97c25'};
+let A = fresh();
+function fresh(){ return {screen:'start', cls:'', team:'', members:'', sid:null, goal:'', game:null, gov:{tax:3,bud:{df:34,lv:33,cu:33}}, pick:null, why:'', ref:{a:'',b:'',c:''}, err:'', submitted:false, sessionId:null}; }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(A)); }catch(e){} }
+let resumable=null; try{ const t=localStorage.getItem(KEY); if(t){ const o=JSON.parse(t); if(o.screen && o.screen!=='start') resumable=o; } }catch(e){}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function sc(){ return SCENARIOS.find(s=>s.id===A.sid); }
+function r1(x){ return Math.round(x*10)/10; }
+function sg(x){ x=r1(x); return x>0?'+'+x:x<0?'−'+Math.abs(x):'±0'; }
+
+/* ---------- 시트 저장 ---------- */
+function postSheet(d){ if(!SHEET_URL) return Promise.reject(new Error('no-url'));
+  return fetch(SHEET_URL,{method:'POST', body:JSON.stringify(d)}).then(r=>r.json()).then(j=>{ if(!j.ok) throw new Error(j.error||'fail'); return j; }); }
+function basePayload(){ const g=A.game, s=sc();
+  return {sid:A.sessionId, cls:A.cls, team:A.team, members:A.members, king:s.king, scenario:s.title, turn:g.t, total:s.turns.length,
+    tr:Math.round(g.st.tr), pp:Math.round(g.st.pp), cr:Math.round(g.st.cr), df:Math.round(g.st.df), lv:Math.round(g.st.lv), cu:Math.round(g.st.cu),
+    ach:g.ach.join(', '), crises:g.crises.length, score:scoreOf(g), finished:g.done}; }
+function sendProgress(){ if(!SHEET_URL||!A.game) return; const g=A.game, l=g.log[g.log.length-1];
+  postSheet(Object.assign({type:'progress', lastChoice:l?l.year+' '+l.label:'', lastWhy:l?l.why:''}, basePayload())).catch(()=>{}); }
+
+/* ---------- 공통 조각 ---------- */
+function gauges(preview){
+  const g=A.game;
+  return '<div class="gauges">'+SKEYS.map(k=>{ const v=g.st[k], p=preview?preview[k]:0, nv=Math.max(0,Math.min(100,v+p));
+    const em = preview && Math.abs(p)>=0.05 ? `<em style="left:${Math.min(v,nv)}%;width:${Math.abs(nv-v)}%"></em>` : '';
+    return `<div class="gauge"><span class="seal" title="${STATS[k].desc}">${STATS[k].icon}</span><div>
+      <div class="top2"><b>${STATS[k].name}</b><span><span class="v">${Math.round(v)}</span>${preview?`<span class="pv ${p>0.05?'up':p<-0.05?'dn':'z'}">${sg(p)}</span>`:''}</span></div>
+      <div class="bar"><i class="${v<20?'lo':''}" style="width:${v}%"></i>${em}<span class="danger"></span></div></div></div>`; }).join('')+'</div>';
+}
+function tagsOf(eff){
+  return Object.entries(eff).filter(([k,v])=>v).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).slice(0,3)
+    .map(([k,v])=>`<span class="tag ${v>0?'up':'dn'}">${STATS[k].name} ${v>0?'▲':'▼'}</span>`).join('');
+}
+function renderWho(){ const w=document.getElementById('who'); w.textContent = A.screen==='start' ? '' : (A.cls?A.cls+' · ':'')+A.team+' 모둠'+(sc()?' · '+sc().king:''); }
+function render(){ renderWho(); ({start:vStart, intro:vIntro, turn:vTurn, result:vResult, end:vEnd, report:vReport})[A.screen](); save(); }
+function go(s){ A.err=''; A.screen=s; render(); window.scrollTo(0,0); }
+function fail(m){ A.err=m; const e=document.getElementById('err'); if(e){ e.textContent=m; e.scrollIntoView({block:'center'}); } }
+function v(id){ const e=document.getElementById(id); return e?e.value:''; }
+
+/* ---------- 시작 ---------- */
+function vStart(){
+  $app.innerHTML=`<div class="stack">
+  ${resumable?`<div class="card row" style="justify-content:space-between; border-left:5px solid var(--gold)"><span><b>진행 중인 게임</b> ${esc(resumable.team)} 모둠 · ${esc((SCENARIOS.find(s=>s.id===resumable.sid)||{}).king||'')}</span><span class="row"><button class="btn primary" data-act="resume">이어하기</button><button class="btn" data-act="discard">지우기</button></span></div>`:''}
+  <section class="hero">
+    <div class="card"><div class="eyebrow">어명을 내릴 시간</div><h1>그대들이 조선의 국정을 맡는다</h1>
+      <p>모둠은 한 왕의 시대로 들어가 나라가 맞닥뜨린 위기를 해마다 하나씩 해결합니다. 사건마다 세 가지 대책 가운데 하나를 고르고, 세금과 예산을 조절해 어명을 내립니다.</p>
+      <p class="muted small">국고·민심·왕권·국방·민생·문화 여섯 지표를 고르게 지켜야 높은 평가를 받습니다. 어떤 정책은 몇 해 뒤에야 효과가 나타나고, 지표가 20 아래로 떨어지면 민란이나 정변이 일어납니다. 매 턴이 끝나면 실제 역사에서 왕이 어떤 선택을 했는지 공개됩니다.</p></div>
+    <div class="card stack"><div class="eyebrow">모둠 정보</div>
+      <label class="f" for="cls">학급<input type="text" id="cls" value="${esc(A.cls)}" placeholder="예: 2-1" autocomplete="off"></label>
+      <label class="f" for="team">모둠 이름<input type="text" id="team" value="${esc(A.team)}" placeholder="예: 집현전" autocomplete="off"></label>
+      <label class="f" for="members">모둠원 <span class="hint">번호와 이름, 쉼표로 구분</span><input type="text" id="members" value="${esc(A.members)}" placeholder="예: 3 김민준, 7 이서연, 12 박지호" autocomplete="off"></label></div>
+  </section>
+  <section class="stack"><h2 style="font-size:22px">어느 왕의 시대로 들어가겠습니까?</h2>
+    <div class="kings">${SCENARIOS.map(s=>`<button type="button" class="king" data-sid="${s.id}" aria-pressed="${A.sid===s.id}"><span class="reign">재위 ${s.reign}</span><h3>${s.king}</h3><span class="tt">${esc(s.title)}</span><p>${esc(s.lead)}</p><span class="hint">${s.turns.length}개 사건</span></button>`).join('')}</div>
+    <div class="err" id="err">${esc(A.err)}</div>
+    <div><button class="btn primary big" data-act="start">즉위하기</button></div></section>
+  <details class="guide card"><summary>교사용 안내</summary><ul>
+    <li>모둠마다 기기 1대로 진행합니다(1~2차시). 사건마다 모둠이 토의한 뒤 결정 근거를 ${MIN_WHY}자 이상 써야 어명을 내릴 수 있습니다.</li>
+    <li>점수는 여섯 지표의 평균(60%)과 가장 낮은 지표(40%)에 업적(+2), 위기(−5), 결말 보정을 더해 계산합니다. 한 분야만 키우면 점수가 낮습니다.</li>
+    <li>실제 왕의 선택이 언제나 최고점은 아닙니다. 광해군·흥선대원군 시나리오는 실제와 같은 선택을 하면 실제와 같은 결말(반정, 하야)을 맞게 설계했습니다.</li>
+    <li>교사용 순위판은 <a href="board.html">board.html</a>에서 볼 수 있습니다(구글 시트 연결 시).</li>
+    <li>사건과 효과는 교과서 수준의 역사적 사실을 바탕으로 게임용으로 단순화한 것입니다.</li></ul></details>
+  </div>`;
+}
+
+/* ---------- 즉위 ---------- */
+function vIntro(){
+  const s=sc();
+  $app.innerHTML=`<div class="sillok stack">
+    <div class="card stack"><div class="eyebrow">${s.reign} · ${s.king}</div><h2 style="font-size:30px">${esc(s.title)}</h2>
+      <p style="font-size:16.5px; line-height:1.8; margin:0">${esc(s.lead)}</p></div>
+    <div class="card"><h3 style="font-size:18px; margin-bottom:10px">즉위 당시 나라의 형편</h3>${gauges(null)}</div>
+    <div class="card stack"><h3 style="font-size:18px">우리 모둠의 국정 방향</h3>
+      <label class="f" for="goal">가장 시급한 문제는 무엇이며, 어떤 지표를 먼저 살릴 것인가요? <span class="hint">${MIN_GOAL}자 이상</span><textarea id="goal">${esc(A.goal)}</textarea></label>
+      <div class="err" id="err">${esc(A.err)}</div>
+      <div class="row"><button class="btn" data-act="home">다른 왕 고르기</button><button class="btn primary big" data-act="begin">첫 사건 맞이하기</button></div></div></div>`;
+}
+
+/* ---------- 턴 ---------- */
+function vTurn(){
+  const s=sc(), g=A.game, turn=s.turns[g.t];
+  const choices=turn.choices.map(c=>`<button type="button" class="ch" data-pick="${c.id}" aria-pressed="${A.pick===c.id}"><b>${esc(c.label)}</b><span>${esc(c.desc)}</span><div class="tags">${tagsOf(c.eff)}</div></button>`).join('');
+  $app.innerHTML=`
+  <div class="banner"><div><div class="yr">${turn.year}년 · ${s.king} 시대</div><h2>사건 ${g.t+1}. ${esc(turn.title)}</h2></div>
+    <div class="row"><div class="steps">${s.turns.map((_,i)=>`<i class="${i<g.t?'d':i===g.t?'n':''}"></i>`).join('')}</div><span class="small muted">현재 점수 <b class="num">${scoreOf(g)}</b></span></div></div>
+  <div class="board">
+    <div class="card"><h3 style="font-size:16px; margin-bottom:10px">국정 지표</h3><div id="gg">${gauges(govEffect(A.gov,g.st))}</div>
+      <p class="hint" style="margin:10px 0 0">빗금은 세금·예산 설정으로 이번 해에 변할 양입니다. 사건 대책의 효과는 어명을 내린 뒤 드러납니다. 점선(20) 아래는 위기입니다.</p>
+      ${g.ach.length?`<div class="badges" style="margin-top:10px">${g.ach.map(a=>`<span class="pill">${esc(a)}</span>`).join('')}</div>`:''}</div>
+    <div><div class="scroll">${turn.war?'<span class="pill bad war">전쟁 · 국방력이 결과를 좌우합니다</span>':''}<h3>${esc(turn.title)}</h3><p>${esc(turn.text)}</p></div>
+      <div class="choices">${choices}</div>
+      <p class="hint">▲▼ 표시는 즉각적인 효과의 방향만 보여 줍니다. 크기와 몇 해 뒤의 효과는 숨겨져 있습니다.</p></div>
+    <form class="card panel" id="act" novalidate>
+      <h3 style="font-size:16px">국정 운영</h3>
+      <div class="sl"><div class="h"><b><label for="tax">세금</label></b><span id="tx">${TAX_LABEL[A.gov.tax]}</span></div>
+        <input type="range" id="tax" min="1" max="5" step="1" value="${A.gov.tax}"><div class="ticks"><span>가볍게(민심▲)</span><span>무겁게(국고▲)</span></div></div>
+      <div class="sl"><div class="h"><b>예산 배분</b><span id="bs"></span></div><div class="budget" id="bb"></div></div>
+      ${['df','lv','cu'].map(k=>`<div class="sl"><div class="h"><label for="b-${k}">${STATS[k].name}</label><span id="bp-${k}"></span></div><input type="range" id="b-${k}" data-bud="${k}" min="0" max="100" step="5" value="${A.gov.bud[k]}"></div>`).join('')}
+      <label class="f" for="why">결정 근거 <span class="hint">왜 이 대책을 골랐는지, 무엇을 감수하는지 모둠 의견을 쓰세요. (${MIN_WHY}자 이상)</span><textarea id="why">${esc(A.why)}</textarea><span class="hint" id="cnt">${A.why.trim().length}자</span></label>
+      <div class="err" id="err">${esc(A.err)}</div>
+      <button class="btn primary big" type="submit">어명을 내린다</button>
+    </form>
+  </div>`;
+  updGov();
+}
+function updGov(){
+  const g=A.game, b=A.gov.bud, tot=(b.df+b.lv+b.cu)||1;
+  const tx=document.getElementById('tx'); if(tx) tx.textContent=TAX_LABEL[A.gov.tax];
+  ['df','lv','cu'].forEach(k=>{ const e=document.getElementById('bp-'+k); if(e) e.textContent=Math.round(b[k]/tot*100)+'%'; });
+  const bb=document.getElementById('bb'); if(bb) bb.innerHTML=['df','lv','cu'].map(k=>`<i style="width:${b[k]/tot*100}%;background:${BUD_COLORS[k]}" title="${STATS[k].name}"></i>`).join('');
+  const gg=document.getElementById('gg'); if(gg) gg.innerHTML=gauges(govEffect(A.gov,g.st));
+}
+
+/* ---------- 결과 ---------- */
+function vResult(){
+  const s=sc(), g=A.game, l=g.log[g.log.length-1], turn=s.turns[l.t], realC=turn.choices.find(c=>c.id===turn.real.pick);
+  $app.innerHTML=`<div class="sillok stack"><div class="card stack">
+    <div class="eyebrow">${l.year}년 실록</div>
+    <div class="rec">${l.year}년, ${s.king}께서 「${esc(turn.title)}」에 대하여 <b>${esc(l.label)}</b>을(를) 명하시고, 세금은 ${({1:'아주 가볍게',2:'가볍게',3:'예년처럼',4:'무겁게',5:'아주 무겁게'})[l.tax]} 걷게 하셨다.</div>
+    <div class="deltas">${SKEYS.map(k=>`<div class="dl"><div class="k">${STATS[k].name}</div><div class="n ${l.delta[k]>0?'up':l.delta[k]<0?'dn':'z'}">${sg(l.delta[k])}</div><div class="small muted num">${Math.round(g.st[k])}</div></div>`).join('')}</div>
+    ${l.notes.map(n=>`<div class="note ${n.type}">${n.type==='later'?'뒤늦게 나타난 효과: ':''}${esc(n.text)}</div>`).join('')}
+    ${l.ach?`<div><span class="ach">業 업적 달성 · ${esc(l.ach)}</span></div>`:''}
+    <div class="real"><b>실제 역사에서는</b> ${l.real?'<span class="pill good">우리와 같은 선택</span>':`<span class="pill">실제 선택: ${esc(realC?realC.label:'')}</span>`}<br>${esc(turn.real.text)}</div>
+    <div class="row" style="justify-content:space-between"><span class="small muted">현재 점수 <b class="num">${scoreOf(g)}</b></span><button class="btn primary big" data-act="next">${g.done?'치세를 마감한다':'다음 사건으로'}</button></div>
+  </div></div>`;
+}
+
+/* ---------- 결말·성찰 ---------- */
+function compareRows(){ const s=sc(), g=A.game;
+  return g.log.map(l=>{ const t=s.turns[l.t], rc=t.choices.find(c=>c.id===t.real.pick);
+    return `<tr><td class="num">${l.year}</td><td>${esc(t.title)}</td><td><b>${esc(l.label)}</b></td><td>${esc(rc.label)}</td><td>${l.real?'<span class="pill good">같음</span>':'<span class="pill">다름</span>'}</td></tr>`; }).join(''); }
+function summaryHTML(){
+  const s=sc(), g=A.game;
+  return `<div class="row" style="justify-content:space-between; align-items:flex-end"><div><div class="eyebrow">${s.reign} · ${s.king}</div><h2 style="font-size:28px">${esc(A.team)} 모둠의 치세</h2></div><div class="score">${scoreOf(g)}<span class="small muted" style="font-family:var(--body)"> 점</span></div></div>
+    ${g.ending?`<div class="note ${g.ending.bonus<0?'crisis':''}"><b>${esc(g.ending.title)}</b> · ${esc(g.ending.text)}</div>`:''}
+    ${g.lateNotes&&g.lateNotes.length?`<div class="note">후대에 나타난 효과: ${g.lateNotes.map(esc).join(' ')}</div>`:''}
+    ${gauges(null)}
+    <div class="row"><b>업적</b> <div class="badges">${g.ach.length?g.ach.map(a=>`<span class="ach" style="font-size:14px;padding:4px 10px">${esc(a)}</span>`).join(''):'<span class="muted small">없음</span>'}</div></div>
+    <div class="row"><b>위기</b> <span class="small">${g.crises.length?g.crises.map(c=>c.year+'년 '+c.name).join(', '):'없음'}</span></div>
+    <div><h3 style="font-size:16px; margin-bottom:6px">우리 선택과 실제 역사 (${realMatches(g)}/${g.log.length} 일치)</h3>
+    <div class="tw"><table class="t"><thead><tr><th>연도</th><th>사건</th><th>우리 모둠</th><th>실제 왕</th><th></th></tr></thead><tbody>${compareRows()}</tbody></table></div></div>`;
+}
+function vEnd(){
+  $app.innerHTML=`<div class="sillok stack"><div class="card stack">${summaryHTML()}</div>
+  <div class="card stack"><h3 style="font-size:18px">사관의 성찰</h3>
+    <label class="f" for="r1">실제 역사와 가장 다르게 선택한 사건은 무엇인가요? 우리 선택의 결과를 실제 역사와 비교해 보세요. <span class="hint">${MIN_REF}자 이상</span><textarea id="r1">${esc(A.ref.a)}</textarea></label>
+    <label class="f" for="r2">실제 왕의 선택 하나를 골라, 당시 상황을 근거로 평가해 보세요. <span class="hint">${MIN_REF}자 이상</span><textarea id="r2">${esc(A.ref.b)}</textarea></label>
+    <label class="f" for="r3">우리 모둠의 치세를 실록 한 문단으로 정리해 보세요. <span class="hint">${MIN_REF}자 이상</span><textarea id="r3">${esc(A.ref.c)}</textarea></label>
+    <div class="err" id="err">${esc(A.err)}</div><div><button class="btn primary big" data-act="report">보고서 만들기</button></div></div></div>`;
+}
+function reportText(){
+  const s=sc(), g=A.game, L=[];
+  L.push('[조선 국정 회의 보고서]'); L.push('학급: '+A.cls+' / 모둠: '+A.team+' / 모둠원: '+A.members);
+  L.push('시대: '+s.king+' ('+s.reign+') '+s.title); L.push('점수: '+scoreOf(g)+'점 / 실제 역사와 일치: '+realMatches(g)+'/'+g.log.length);
+  L.push('최종 지표: '+SKEYS.map(k=>STATS[k].name+' '+Math.round(g.st[k])).join(', '));
+  L.push('업적: '+(g.ach.join(', ')||'없음')+' / 위기: '+(g.crises.map(c=>c.year+' '+c.name).join(', ')||'없음'));
+  if(g.ending) L.push('결말: '+g.ending.title+' - '+g.ending.text);
+  L.push(''); L.push('■ 국정 방향'); L.push(A.goal); L.push(''); L.push('■ 사건별 결정');
+  g.log.forEach(l=>{ const t=s.turns[l.t], rc=t.choices.find(c=>c.id===t.real.pick);
+    L.push(l.year+'년 '+t.title+' | 선택: '+l.label+' | 세금: '+TAX_LABEL[l.tax]+' | 실제: '+rc.label);
+    L.push('   근거: '+l.why); L.push('   변화: '+SKEYS.map(k=>STATS[k].name+sg(l.delta[k])).join(' ')); });
+  L.push(''); L.push('■ 성찰'); L.push('1) '+A.ref.a); L.push('2) '+A.ref.b); L.push('3) '+A.ref.c);
+  return L.join('\n');
+}
+function vReport(){
+  const g=A.game;
+  $app.innerHTML=`<div class="sillok stack"><div class="card stack">${summaryHTML()}</div>
+  <div class="card stack"><h3 style="font-size:18px">국정 방향</h3><div class="qa"><p>${esc(A.goal)}</p></div>
+    <h3 style="font-size:18px">사건별 결정 근거</h3><div class="tw"><table class="t"><thead><tr><th>연도</th><th>선택</th><th>근거</th></tr></thead><tbody>${g.log.map(l=>`<tr><td class="num">${l.year}</td><td>${esc(l.label)}</td><td>${esc(l.why)}</td></tr>`).join('')}</tbody></table></div>
+    <h3 style="font-size:18px">성찰</h3>
+    <div class="qa"><h3>실제 역사와 다른 선택</h3><p>${esc(A.ref.a)}</p></div>
+    <div class="qa"><h3>실제 왕의 선택 평가</h3><p>${esc(A.ref.b)}</p></div>
+    <div class="qa"><h3>우리 치세의 실록</h3><p>${esc(A.ref.c)}</p></div></div>
+  <div class="card stack"><h3 style="font-size:18px">제출하기</h3>
+    ${SHEET_URL?`<div class="row"><button class="btn primary big" data-act="submit" ${A.submitted?'disabled':''}>${A.submitted?'제출 완료':'선생님께 제출하기'}</button><span class="small" id="sent" role="status">${A.submitted?'제출되었습니다.':''}</span></div>
+      <p class="small muted" style="margin:0">전송이 안 될 때는 아래 버튼으로 보고서를 복사해 클래스룸에 붙여 넣으세요.</p>`:`<p class="small muted" style="margin:0">아래 버튼으로 보고서를 복사해 클래스룸 등에 붙여 넣으세요.</p>`}
+    <div class="row"><button class="btn ${SHEET_URL?'':'primary'}" data-act="copy">보고서 텍스트 복사</button><span class="small" id="copied" role="status"></span></div>
+    <textarea class="copybox" id="copybox" readonly hidden>${esc(reportText())}</textarea>
+    <div><button class="btn" data-act="newgame">새 게임</button></div></div></div>`;
+}
+
+/* ---------- 이벤트 ---------- */
+function syncStart(){ if(A.screen==='start'){ A.cls=v('cls').trim(); A.team=v('team').trim(); A.members=v('members').trim(); } }
+function syncRef(){ if(A.screen==='end'){ A.ref.a=v('r1'); A.ref.b=v('r2'); A.ref.c=v('r3'); } }
+document.addEventListener('click', e=>{
+  const t=e.target.closest('[data-sid],[data-act],[data-pick]'); if(!t||t.disabled) return;
+  if(t.dataset.sid){ syncStart(); A.sid=t.dataset.sid; A.err=''; render(); return; }
+  if(t.dataset.pick){ A.pick=t.dataset.pick; document.querySelectorAll('.ch').forEach(b=>b.setAttribute('aria-pressed', b.dataset.pick===A.pick)); save(); return; }
+  const a=t.dataset.act;
+  if(a==='resume'){ A=resumable; resumable=null; A.err=''; render(); return; }
+  if(a==='discard'){ resumable=null; try{localStorage.removeItem(KEY);}catch(_){} render(); return; }
+  if(a==='start'){ syncStart(); if(!A.team) return fail('모둠 이름을 입력하세요.'); if(!A.members) return fail('모둠원을 입력하세요.'); if(!A.sid) return fail('왕을 고르세요.');
+    resumable=null; A.game=initGame(sc()); A.sessionId=Date.now().toString(36)+Math.random().toString(36).slice(2,7); A.submitted=false; A.goal=''; A.ref={a:'',b:'',c:''}; A.pick=null; A.why=''; A.gov={tax:3,bud:{df:34,lv:33,cu:33}};
+    return go('intro'); }
+  if(a==='home'){ A.goal=v('goal'); return go('start'); }
+  if(a==='begin'){ A.goal=v('goal'); if(A.goal.trim().length<MIN_GOAL) return fail('국정 방향을 '+MIN_GOAL+'자 이상 쓰세요.'); sendProgress(); return go('turn'); }
+  if(a==='next'){ A.pick=null; A.why=''; return go(A.game.done?'end':'turn'); }
+  if(a==='report'){ syncRef(); if([A.ref.a,A.ref.b,A.ref.c].some(x=>x.trim().length<MIN_REF)) return fail('세 질문에 각각 '+MIN_REF+'자 이상 답하세요.'); return go('report'); }
+  if(a==='submit'){ const m=document.getElementById('sent'); t.disabled=true; m.textContent='전송 중입니다…';
+    postSheet(Object.assign({type:'submit', goal:A.goal, matches:realMatches(A.game)+'/'+A.game.log.length,
+      decisions:A.game.log.map(l=>l.year+' '+l.title+' → '+l.label+' (세금 '+TAX_LABEL[l.tax]+')\n근거: '+l.why),
+      ref1:A.ref.a, ref2:A.ref.b, ref3:A.ref.c, ending:A.game.ending?A.game.ending.title:'', report:reportText()}, basePayload()))
+      .then(()=>{ A.submitted=true; save(); t.textContent='제출 완료'; m.textContent='제출되었습니다.'; }, ()=>{ t.disabled=false; m.textContent='전송에 실패했습니다. 다시 누르거나 보고서를 복사해 제출하세요.'; });
+    return; }
+  if(a==='copy'){ const m=document.getElementById('copied'), fb=()=>{ const b=document.getElementById('copybox'); b.hidden=false; b.select(); m.textContent='자동 복사가 막혀 있습니다. 상자 내용을 직접 복사하세요.'; };
+    try{ navigator.clipboard.writeText(reportText()).then(()=>{ m.textContent='복사했습니다.'; }, fb); }catch(_){ fb(); } return; }
+  if(a==='newgame'){ const k={cls:A.cls,team:A.team,members:A.members}; A=Object.assign(fresh(),k); return go('start'); }
+});
+document.addEventListener('input', e=>{
+  const id=e.target.id;
+  if(id==='tax'){ A.gov.tax=+e.target.value; updGov(); save(); return; }
+  if(e.target.dataset.bud){ A.gov.bud[e.target.dataset.bud]=+e.target.value; updGov(); save(); return; }
+  if(id==='why'){ A.why=e.target.value; document.getElementById('cnt').textContent=A.why.trim().length+'자'; save(); return; }
+  if(['cls','team','members'].includes(id)){ syncStart(); save(); }
+  if(id==='goal'){ A.goal=e.target.value; save(); }
+  if(['r1','r2','r3'].includes(id)){ syncRef(); save(); }
+});
+document.addEventListener('submit', e=>{
+  if(e.target.id!=='act') return; e.preventDefault();
+  if(!A.pick) return fail('사건에 대한 대책을 하나 고르세요.');
+  if(A.why.trim().length<MIN_WHY) return fail('결정 근거를 '+MIN_WHY+'자 이상 쓰세요. 지금 '+A.why.trim().length+'자입니다.');
+  if(A.gov.bud.df+A.gov.bud.lv+A.gov.bud.cu===0) A.gov.bud={df:34,lv:33,cu:33};
+  playTurn(A.game, sc(), A.pick, A.gov, A.why.trim());
+  sendProgress(); go('result');
+});
+render();
+</script>
+</body>
+</html>
