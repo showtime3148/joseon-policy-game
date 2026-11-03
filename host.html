@@ -37,8 +37,11 @@ main{max-width:1500px}
 <script src="core.js"></script>
 <script src="art.js"></script>
 <script src="common.js"></script>
+<script src="server/server.gs.js"></script>
+<script src="demo.js"></script>
 <script>
 const KEY='joseon-host-v2';
+function alertBoxSafe(){}
 const $app=document.getElementById('app');
 let H=load(), room=null, ver=0, shown='', timer=null, tick=null, pick=null;
 function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } }
@@ -51,7 +54,7 @@ function poll(){
   if(!H.code) return;
   API.state(H.code, ver).then(j=>{ setConn(true);
     if(!j.ok){ if(/찾을 수 없/.test(j.error||'')){ H={}; save(); room=null; render(); } return; }
-    if(j.same) return; room=j.room; ver=room.ver; render();
+    if(j.same){ runBots(room); return; } room=j.room; ver=room.ver; render(); runBots(room);
   }).catch(()=>setConn(false)).finally(()=>{ timer=setTimeout(poll, 2000); });
 }
 function render(){
@@ -78,7 +81,7 @@ function alertBox(m){ const e=document.getElementById('hmsg'); if(e){ e.textCont
 function ctlHTML(){
   const s=scenOf(room), n=room.teams.filter(t=>t.submitted).length, N=room.teams.length;
   let left='', right='';
-  if(room.phase==='lobby'){ left=`<span class="pill navy">입궐한 모둠 ${N}</span>`; right=`<button class="btn primary big" data-cmd="open" ${N?'':'disabled'}>첫 사건 열기</button>`; }
+  if(room.phase==='lobby'){ left=`<span class="pill navy">입궐한 모둠 ${N}</span>${DEMO?`<button class="btn" data-act="bots">체험용 가상 모둠 3개 추가</button><a class="btn jade" href="index.html?room=${room.code}" target="_blank" rel="noopener">모둠 화면 열기(새 탭)</a>`:''}`; right=`<button class="btn primary big" data-cmd="open" ${N?'':'disabled'}>첫 사건 열기</button>`; }
   if(room.phase==='deciding'){ left=`<span class="timer" id="timer">00:00</span><span class="pill ${n===N?'good':'navy'}" style="font-size:15px">어명 제출 ${n}/${N}</span>`;
     right=`<button class="btn primary big" data-cmd="reveal">${n<N?'결과 공개 ('+(N-n)+'모둠 미제출)':'결과 공개'}</button>`; }
   if(room.phase==='revealed'){ const last=room.turn+1>=s.turns.length; left=`<span class="pill good" style="font-size:15px">사건 ${room.turn+1}/${s.turns.length} 결과</span>`;
@@ -94,7 +97,7 @@ function vSetup(){
   document.getElementById('who').textContent='';
   $app.innerHTML=`<div class="stack">
     <div class="banner">${bannerSVG(200)}<div class="over"><h1>朝鮮 國政 會議</h1><p>교사 화면 · 방을 만들고 교실 화면에 띄우세요</p></div></div>
-    ${!serverUrl()?'<div class="note crisis">config.js에 서버 주소(SERVER_URL)가 없습니다. README의 설정 순서를 따라 주세요.</div>':''}
+    ${DEMO?'<div class="note"><b>체험 모드</b> · 서버 없이 이 브라우저 안에서만 동작합니다. 방을 만든 뒤 <b>가상 모둠 추가</b>를 누르고, <b>모둠 화면 열기</b>로 새 탭에서 직접 한 모둠이 되어 보세요.</div>':''}
     <div class="card stack"><h2 style="font-size:22px">어느 왕의 시대로 들어갈까요?</h2>
       <div class="kings">${SCENARIOS.map(s=>`<button type="button" class="king" data-sid="${s.id}" aria-pressed="${pick===s.id}"><span class="small muted">재위 ${s.reign}</span><h3>${s.king}</h3><b style="font-size:14px">${esc(s.title)}</b><p>${esc(s.lead)}</p></button>`).join('')}</div>
       <div class="row"><label class="f" for="cls" style="flex:0 1 200px">학급<input type="text" id="cls" placeholder="예: 2-1" autocomplete="off"></label>
@@ -163,6 +166,7 @@ document.addEventListener('click', e=>{
   if(a==='create'){ if(!pick) return fail('왕을 고르세요.'); t.disabled=true;
     API.post({action:'create', sid:pick, cls:document.getElementById('cls').value.trim()}).then(j=>{ if(!j.ok){ t.disabled=false; return fail(j.error); } H={code:j.code, hostKey:j.hostKey}; save(); ver=0; poll(); })
       .catch(()=>{ t.disabled=false; fail('서버에 연결하지 못했습니다. config.js의 서버 주소를 확인하세요.'); }); }
+  if(a==='bots'){ t.disabled=true; addBots(H.code).then(()=>{ ver=0; poll(); }); return; }
   if(a==='newroom'){ H={}; save(); room=null; ver=0; render(); }
 });
 render(); poll();
