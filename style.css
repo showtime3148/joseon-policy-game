@@ -213,3 +213,73 @@ svg.advsvg{width:100%; height:auto; display:block}
 .modal .advtop{display:grid; grid-template-columns:120px 1fr; gap:14px; align-items:center}
 @media (max-width:520px){ .modal .bridge{grid-template-columns:1fr} .modal .advtop{grid-template-columns:90px 1fr} }
 .pcard.dim{opacity:.45}
+
+/* 사건 삽화 */
+svg.scene{width:100%; height:auto; display:block; border-radius:10px; border:1px solid var(--line); background:#efe5cf}
+.scene *{transform-box:fill-box}
+@keyframes scWave{from{transform:translateX(0)}to{transform:translateX(-46px)}}
+@keyframes scWave2{from{transform:translateX(-46px)}to{transform:translateX(0)}}
+@keyframes scBob{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-5px) rotate(1.5deg)}}
+@keyframes scFlap{0%,100%{transform:skewY(0) scaleX(1)}50%{transform:skewY(-6deg) scaleX(.9)}}
+@keyframes scSmoke{0%{transform:translateY(6px); opacity:.2}50%{opacity:.8}100%{transform:translateY(-14px); opacity:0}}
+@keyframes scRain{from{transform:translateY(-30px)}to{transform:translateY(30px)}}
+@keyframes scSway{0%,100%{transform:rotate(-2deg)}50%{transform:rotate(2deg)}}
+@keyframes scFlash{0%,80%,100%{opacity:1}40%{opacity:.15}}
+@keyframes scFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes scBeat{0%,100%{transform:scale(1)}10%{transform:scale(1.08)}20%{transform:scale(1)}}
+@keyframes scLift{0%,100%{transform:translateY(0)}50%{transform:translateY(-26px)}}
+@keyframes scDrift{0%,100%{transform:translateX(0)}50%{transform:translateX(18px)}}
+@keyframes scGlow{0%,100%{opacity:1}50%{opacity:.55}}
+@keyframes scTilt{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes scWalk{0%,100%{transform:translateX(0)}50%{transform:translateX(12px)}}
+.sc-wave{animation:scWave 2.4s linear infinite} .sc-wave2{animation:scWave2 3s linear infinite}
+.sc-bob{animation:scBob 2.6s ease-in-out infinite; transform-origin:center}
+.sc-flap{animation:scFlap 1.2s ease-in-out infinite; transform-origin:left center}
+.sc-smoke{animation:scSmoke 3s ease-in infinite}
+.sc-rain{animation:scRain .6s linear infinite}
+.sc-sway{animation:scSway 3.2s ease-in-out infinite; transform-origin:bottom center}
+.sc-flash{animation:scFlash 1.4s steps(2) infinite}
+.sc-float{animation:scFloat 3s ease-in-out infinite}
+.sc-beat{animation:scBeat 1s ease-out infinite; transform-origin:center}
+.sc-lift{animation:scLift 3.6s ease-in-out infinite}
+.sc-drift{animation:scDrift 9s ease-in-out infinite}
+.sc-glow{animation:scGlow 1.6s ease-in-out infinite}
+.sc-tilt{animation:scTilt 3s ease-in-out infinite; transform-origin:center}
+.sc-walk,.sc-carry{animation:scWalk 2.4s ease-in-out infinite}
+.sc-hit{animation:scBeat 1s ease-out infinite}
+.evscene{display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:20px; align-items:center; border-left:6px solid var(--red)}
+.evscene h2{font-size:28px; margin:2px 0 8px} .evscene p{margin:0; font-size:16.5px; line-height:1.75}
+@media (max-width:900px){ .evscene{grid-template-columns:1fr} }
+
+/* 결과 연출 */
+[data-at]{opacity:0; transform:translateY(16px); transition:opacity .45s ease, transform .45s cubic-bezier(.2,.8,.2,1)}
+[data-at].in{opacity:1; transform:none}
+.dl[data-at]{transform:rotateX(90deg); transform-origin:top} .dl[data-at].in{transform:none}
+.ach[data-at],.unlock[data-at]{transform:scale(.5)} .ach[data-at].in,.unlock[data-at].in{transform:scale(1)}
+.skip{position:fixed; right:18px; bottom:18px; z-index:20; background:var(--navy); color:#fff; border:none; border-radius:99px; padding:10px 18px; font-weight:700; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.confetti{position:fixed; width:9px; height:14px; z-index:60; pointer-events:none; border-radius:2px; animation:conf 1.5s cubic-bezier(.15,.6,.4,1) forwards}
+@keyframes conf{0%{transform:translate(0,0) rotate(0); opacity:1}70%{opacity:1}100%{transform:translate(var(--dx), calc(var(--dy) + 260px)) rotate(var(--rot)); opacity:0}}
+.kswap{position:relative}
+.kswap .k-new{position:absolute; inset:0; opacity:0; transition:opacity 1.4s ease}
+.kswap.swapped .k-new{opacity:1}
+.kswap.swapped .k-old{filter:blur(1px)}
+.chip{transition:transform .35s cubic-bezier(.3,1.6,.5,1), opacity .3s}
+.chips[data-at] .chip, [data-fx="chips"] .chip{transform:translateY(-40px) scale(.6); opacity:0}
+[data-fx="chips"] .chip.drop{transform:none; opacity:1}
+.mv{font-size:12px; margin-left:4px} .mv.up{color:var(--good)} .mv.dn{color:var(--bad)}
+.flipcard{perspective:1200px; min-height:150px}
+.flipcard .fc-in{position:relative; width:100%; min-height:150px; transition:transform .9s cubic-bezier(.3,.9,.3,1); transform-style:preserve-3d}
+.flipcard.flipped .fc-in{transform:rotateY(180deg)}
+.fc-front,.fc-back{position:absolute; inset:0; backface-visibility:hidden; -webkit-backface-visibility:hidden; border-radius:10px; padding:16px 18px; display:flex; flex-direction:column; gap:8px; justify-content:center}
+.fc-front{background:repeating-linear-gradient(45deg,#24384c 0 12px,#2a4258 12px 24px); color:#f5ecd8; align-items:center; text-align:center; border:3px solid var(--gold)}
+.fc-front b{font-family:var(--display); font-size:20px}
+.fc-back{background:var(--jade-soft); border:3px solid var(--jade); transform:rotateY(180deg)}
+.fc-back .tit{color:var(--jade); font-family:var(--display); font-size:18px}
+.fc-back p{margin:0; font-size:15.5px; line-height:1.7}
+.matchst{position:absolute; top:12px; right:14px; border:3px solid var(--red); color:var(--red); font-family:var(--display); font-weight:800; padding:2px 10px; border-radius:6px; transform:rotate(-10deg); background:rgba(255,255,255,.6)}
+.flipcard.flipped ~ .x{}
+.dc.realhl{border-color:var(--jade); background:var(--jade-soft); box-shadow:0 0 0 3px var(--jade-soft)}
+@media (prefers-reduced-motion: reduce){ [data-at]{opacity:1!important; transform:none!important} .flipcard .fc-in{transition:none} }
+.fc-back{position:relative!important; inset:auto!important; min-height:150px}
+.kgrid{display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:16px; align-items:center}
+@media (max-width:700px){ .kgrid{grid-template-columns:1fr} }

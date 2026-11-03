@@ -24,6 +24,8 @@
 <script src="advisors.js"></script>
 <script src="core.js"></script>
 <script src="art.js"></script>
+<script src="scenes.js"></script>
+<script src="anim.js"></script>
 <script src="common.js"></script>
 <script src="server/server.gs.js"></script>
 <script src="demo.js"></script>
@@ -64,6 +66,7 @@ function render(){
   window.scrollTo(0,0);
 }
 function liveUpdate(){
+  if(room.phase==='revealed') return;
   const g=document.getElementById('live'); if(g) g.innerHTML=othersHTML();
   const lb=document.getElementById('lb'); if(lb) lb.innerHTML=leaderboardHTML(room, L.teamId);
   const st=document.getElementById('subst'); if(st) st.innerHTML=subStatus();
@@ -120,7 +123,7 @@ function draft(){
 function vDecide(){
   const s=myScen(), m=me(), turn=s.turns[room.turn], d=draft();
   const head=`<div class="row between" style="margin-bottom:12px"><div class="steps">${s.turns.map((_,i)=>`<i class="${i<room.turn?'d':i===room.turn?'n':''}"></i>`).join('')}</div><span id="subst">${subStatus()}</span></div>
-    <div class="card event">${eventArt(turn.art)}<div><div class="yr">${turn.year}년 · 사건 ${room.turn+1}/${s.turns.length}</div><h2>${esc(turn.title)}</h2><p>${esc(turn.text)}</p>${turn.war?'<p style="margin-top:8px"><span class="pill bad">전쟁 · 쌓아 둔 국방력이 피해를 좌우합니다</span></p>':''}</div></div>`;
+    <div class="card evscene">${eventScene(turn.art, turn.war)}<div><div class="yr">${turn.year}년 · 사건 ${room.turn+1}/${s.turns.length}</div><h2>${esc(turn.title)}</h2><p>${esc(turn.text)}</p>${turn.war?'<p style="margin-top:8px"><span class="pill bad">전쟁 · 쌓아 둔 국방력이 피해를 좌우합니다</span></p>':''}</div></div>`;
   if(m.submitted && !editing){
     const sub=room.mySub, ch=sub&&turn.choices.find(c=>c.id===sub.choice);
     $app.innerHTML=`${head}<div class="play" style="margin-top:16px"><div class="stack">
@@ -190,20 +193,32 @@ function updGov(){
 /* ---------- 결과 공개 ---------- */
 function vReveal(){
   const s=myScen(), m=me(), turn=s.turns[room.turn], l=m.log.find(x=>x.t===room.turn);
-  const r=rankOf(room,m.id);
-  $app.innerHTML=`<div class="stack">
-    <div class="card stack"><div class="row between"><div class="eyebrow">${turn.year}년 실록</div><span class="pill navy">현재 ${r}위 · ${m.score}점</span></div>
-      ${l?`<div class="rec">${turn.year}년, ${s.king}께서 「${esc(turn.title)}」에 대하여 <b>${esc(l.label)}</b>을(를) 명하시고${l.card&&cardById(l.card)?`, 아울러 「${esc(cardById(l.card).name)}」을(를) 시행하시고`:''}, 세금은 ${TAX_TXT[l.tax]} 걷게 하셨다.</div>
-      <div class="deltas">${SKEYS.map(k=>`<div class="dl"><div class="k">${STATS[k].name}</div><div class="n ${l.delta[k]>0?'up':l.delta[k]<0?'dn':'z'}">${sg(l.delta[k])}</div><div class="small muted num">${Math.round(m.st[k])}</div></div>`).join('')}</div>
-      ${l.notes.map(n=>`<div class="note ${n.type}">${n.type==='later'?'뒤늦게 나타난 효과: ':''}${esc(n.text)}</div>`).join('')}
-      ${(l.unlocks||[]).map(id=>{ const a=advisorById(id); return `<div class="unlock pop"><div class="p">${advisorSVG(a,false)}</div><div><div class="eyebrow" style="color:#f3d9a0">히든 조언자 해금</div><h3>${esc(a.name)} · ${esc(a.title)}</h3><p style="margin:4px 0 0">“${esc(a.hello)}”</p></div></div>`; }).join('')}
-      ${l.ach?`<div><span class="ach pop">業 업적 달성 · ${esc(l.ach)}</span></div>`:''}${l.card&&cardById(l.card)?`<div class="cardnote"><b>현대의 ${esc(cardById(l.card).modern)}</b> → 조선의 「${esc(cardById(l.card).name)}」 · ${esc(cardById(l.card).concept)} <span class="small muted">(통합사회 · ${esc(cardById(l.card).unit)})</span></div>`:''}`:'<p class="muted">이번 사건에는 참여하지 않았습니다.</p>'}
+  const prev=prevStats(m), r=rankOf(room,m.id);
+  const notes = l ? l.notes.map((n,i)=>`<div class="note ${n.type}" data-at="${3000+i*350}">${n.type==='later'?'뒤늦게 나타난 효과: ':''}${esc(n.text)}</div>`).join('') : '';
+  const cd = l&&l.card&&cardById(l.card);
+  let at=3400+(l?l.notes.length:0)*350;
+  const extras = l ? [
+    cd?`<div class="cardnote" data-at="${at}"><b>현대의 ${esc(cd.modern)}</b> → 조선의 「${esc(cd.name)}」 · ${esc(cd.concept)}</div>`:'',
+    ...(l.unlocks||[]).map((id,k)=>{ const a=advisorById(id); return `<div class="unlock" data-at="${at+400+k*500}" data-fx="confetti"><div class="p">${advisorSVG(a,false)}</div><div><div class="eyebrow" style="color:#f3d9a0">히든 조언자 해금</div><h3>${esc(a.name)} · ${esc(a.title)}</h3><p style="margin:4px 0 0">“${esc(a.hello)}”</p></div></div>`; }),
+    l.ach?`<div><span class="ach" data-at="${at+300}" data-fx="confetti">業 업적 달성 · ${esc(l.ach)}</span></div>`:''
+  ].join('') : '';
+  const tDist=at+1200, tReal=tDist+1500, tRank=tReal+1400;
+  $app.innerHTML=`<div class="stack" id="rv"><button class="skip" data-act="skip">건너뛰기 ▶▶</button>
+    <div class="card stack"><div class="row between"><div class="eyebrow">${turn.year}년 실록</div><span class="pill navy" data-at="${tRank+600}">현재 ${r}위 · ${m.score}점</span></div>
+      ${l?`<div class="rec" data-at="0" data-fx="type">${turn.year}년, ${s.king}께서 「${esc(turn.title)}」에 대하여 <b>${esc(l.label)}</b>을(를) 명하시고${cd?`, 아울러 「${esc(cd.name)}」을(를) 시행하시고`:''}, 세금은 ${TAX_TXT[l.tax]} 걷게 하셨다.</div>
+      <div class="deltas">${SKEYS.map((k,i)=>`<div class="dl" data-at="${1700+i*160}" data-fx="count" data-to="${l.delta[k]}"><div class="k">${STATS[k].name}</div><div class="n z">±0</div><div class="small muted num">${Math.round(m.st[k])}</div></div>`).join('')}</div>
+      ${notes}${extras}`:'<p class="muted">이번 사건에는 참여하지 않았습니다.</p>'}
     </div>
-    <div class="card stack"><h3 style="font-size:18px">${room.sid?'모둠들의 선택과 실제 역사':esc(s.king)+' 시대를 고른 모둠들의 선택과 실제 역사'}</h3>${distHTML(room, room.turn, m.id, m.sid)}
-      <div class="real"><b>실제 역사에서는</b> ${esc(turn.real.text)}</div></div>
-    <div class="play"><div class="card"><h3 style="font-size:17px; margin-bottom:10px">각 나라의 모습</h3><div id="live">${othersHTML()}</div></div>
-      <div class="side"><div class="card"><h3 style="font-size:16px; margin-bottom:10px">순위</h3><div id="lb">${leaderboardHTML(room,m.id)}</div></div>
-        <div class="card"><p class="small muted" style="margin:0">${room.turn+1>=s.turns.length?'선생님이 최종 결과를 열면 치세가 마무리됩니다.':'선생님이 다음 사건을 열 때까지 결과를 함께 살펴보세요.'}</p></div></div></div></div>`;
+    <div class="play"><div class="card stack"><h3 style="font-size:17px">우리 나라의 변화</h3>
+        <div class="kgrid"><div class="kswap" data-at="2300" data-fx="swap"><div class="k-old">${kingdomSVG(prev)}</div><div class="k-new">${kingdomSVG(m.st)}</div></div>
+        <div data-at="2300" data-fx="bars">${gaugesFromTo(prev, m.st)}</div></div></div>
+      <div class="side"><div class="card"><h3 style="font-size:16px; margin-bottom:10px">순위</h3><div data-at="${tRank}" data-fx="rank" id="lbanim">${lbAnimHTML(room,m.id,room.turn)}</div></div></div></div>
+    <div class="card stack"><h3 style="font-size:18px">${room.sid?'모둠들의 선택':esc(s.king)+' 시대를 고른 모둠들의 선택'}</h3>
+      <div data-at="${tDist}" data-fx="chips">${distAnimHTML(room, room.turn, m.id, m.sid)}</div>
+      ${realFlipHTML(turn, l&&l.real, tReal, false)}</div>
+    <div class="card"><h3 style="font-size:17px; margin-bottom:10px">각 나라의 모습</h3><div id="live">${othersHTML()}</div>
+      <p class="small muted" style="margin:10px 0 0">${room.turn+1>=s.turns.length?'선생님이 최종 결과를 열면 치세가 마무리됩니다.':'선생님이 다음 사건을 열 때까지 결과를 함께 살펴보세요.'}</p></div></div>`;
+  runStages(document.getElementById('rv'));
 }
 
 /* ---------- 최종 ---------- */
@@ -298,6 +313,7 @@ document.addEventListener('click', e=>{
   if(t.dataset.usecard!=null){ L.draft.card=t.dataset.usecard||null; save(); closeModal(); document.querySelectorAll('.pcard').forEach(b=>b.setAttribute('aria-pressed', b.dataset.card===L.draft.card)); const s=document.getElementById('cardsel'); if(s) s.innerHTML=cardSelHTML(); return; }
   if(t.dataset.pick){ L.draft.pick=t.dataset.pick; save(); document.querySelectorAll('.ch').forEach(b=>b.setAttribute('aria-pressed', b.dataset.pick===L.draft.pick)); return; }
   const a=t.dataset.act;
+  if(a==='skip'){ const rv=document.getElementById('rv'); if(rv) skipStages(rv); return; }
   if(a==='edit'){ editing=true; const sub=room.mySub; if(sub){ draft(); Object.assign(L.draft,{pick:sub.choice, card:sub.card||null, tax:sub.gov.tax, bud:Object.assign({},sub.gov.bud), why:sub.why}); save(); } render(); return; }
   if(a==='goal'){ const g=v('goal'); t.disabled=true; API.post({action:'goal', code:L.code, teamId:L.teamId, goal:g}).then(j=>{ t.disabled=false; document.getElementById('gs').textContent=j.ok?'저장됨':'저장 실패'; }).catch(()=>{ t.disabled=false; document.getElementById('gs').textContent='저장 실패'; }); return; }
   if(a==='copy'){ const m=document.getElementById('copied'), fb=()=>{ const b=document.getElementById('copybox'); b.hidden=false; b.select(); m.textContent='상자 내용을 직접 복사하세요.'; };

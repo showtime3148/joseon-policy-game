@@ -40,6 +40,8 @@ main{max-width:1500px}
 <script src="advisors.js"></script>
 <script src="core.js"></script>
 <script src="art.js"></script>
+<script src="scenes.js"></script>
+<script src="anim.js"></script>
 <script src="common.js"></script>
 <script src="server/server.gs.js"></script>
 <script src="demo.js"></script>
@@ -72,9 +74,9 @@ function render(){
 function live(){
   const fb=document.getElementById('feed'); if(fb) fb.innerHTML=feedHTML();
   const gc=document.getElementById('gcount'); if(gc) gc.innerHTML=groupCount();
-  const g=document.getElementById('live'); if(g) g.innerHTML=gridHTML();
+  const g=document.getElementById('live'); if(g && room.phase!=='revealed') g.innerHTML=gridHTML();
   const c=document.getElementById('ctl'); if(c) c.innerHTML=ctlHTML();
-  const lb=document.getElementById('lb'); if(lb) lb.innerHTML=leaderboardHTML(room);
+  const lb=document.getElementById('lb'); if(lb && room.phase!=='revealed') lb.innerHTML=leaderboardHTML(room);
 }
 function gridHTML(){ return room.teams.length ? '<div class="teams">'+room.teams.map(t=>teamCard(room,t,{members:true})).join('')+'</div>' : '<p class="muted">아직 입궐한 모둠이 없습니다.</p>'; }
 function cmd(c, btn){
@@ -137,14 +139,14 @@ function vDecide(){
   if(G.length<=1){
     const s=G.length?G[0].s:scenOf(room), turn=s.turns[room.turn];
     $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">${steps}
-      <div class="card bigev">${eventArt(turn.art)}<div><div class="yr" style="font-size:18px">${turn.year}년 · ${s.king} 시대</div><h2>${esc(turn.title)}</h2><p>${esc(turn.text)}</p>${turn.war?'<p style="margin-top:10px"><span class="pill bad" style="font-size:15px">전쟁 · 국방력이 피해를 좌우합니다</span></p>':''}</div></div>
+      <div class="card evscene">${eventScene(turn.art, turn.war)}<div><div class="yr" style="font-size:18px">${turn.year}년 · ${s.king} 시대</div><h2>${esc(turn.title)}</h2><p>${esc(turn.text)}</p>${turn.war?'<p style="margin-top:10px"><span class="pill bad" style="font-size:15px">전쟁 · 국방력이 피해를 좌우합니다</span></p>':''}</div></div>
       <div class="hchoices">${turn.choices.map((c,i)=>`<div class="ch"><span class="lt">${'甲乙丙'[i]}</span><b>${esc(c.label)}</b><span>${esc(c.desc)}</span></div>`).join('')}</div>
       <div class="feedbox" id="feed">${feedHTML()}</div>
       <div class="card"><h3 style="font-size:20px; margin-bottom:10px">모둠별 논의 현황</h3><div id="live">${gridHTML()}</div></div></div>`;
   } else {
     $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">${steps}
       <div class="evgrid">${G.map(g=>{ const turn=g.s.turns[room.turn]; return `<div class="card stack" style="border-left:6px solid var(--red)">
-        <div class="row" style="align-items:flex-start; flex-wrap:nowrap"><div style="width:110px; flex:none">${eventArt(turn.art)}</div>
+        ${eventScene(turn.art, turn.war)}<div class="row" style="align-items:flex-start; flex-wrap:nowrap">
         <div><div class="yr">${g.s.king} · ${turn.year}년</div><h3 style="font-size:22px">${esc(turn.title)}</h3><p class="small" style="margin:4px 0 0">${esc(turn.text)}</p></div></div>
         <div class="small muted">${turn.choices.map((c,i)=>'甲乙丙'[i]+' '+esc(c.label)).join(' · ')}</div></div>`; }).join('')}</div>
       <div class="feedbox" id="feed">${feedHTML()}</div>
@@ -164,17 +166,19 @@ function cardsUsed(teams){
 }
 function vReveal(){
   const G=groups(room);
-  const blocks=G.map(g=>{ const turn=g.s.turns[room.turn];
-    const achs=g.teams.map(t=>{ const l=t.log.find(x=>x.t===room.turn); return l&&l.ach?`<span class="ach pop">業 ${esc(t.name)} · ${esc(l.ach)}</span>`:''; }).join('');
+  const blocks=G.map((g,gi)=>{ const turn=g.s.turns[room.turn];
+    const achs=g.teams.map(t=>{ const l=t.log.find(x=>x.t===room.turn); return l&&l.ach?`<span class="ach" data-at="${2600+gi*300}" data-fx="confetti">業 ${esc(t.name)} · ${esc(l.ach)}</span>`:''; }).join('');
     const crises=g.teams.map(t=>{ const l=t.log.find(x=>x.t===room.turn); return l?l.notes.filter(n=>n.type==='crisis').map(n=>`<span class="pill bad">${esc(t.name)} · ${esc(n.text)}</span>`).join(''):''; }).join('');
-    return `<div class="card stack"><div class="row between"><div><div class="yr" style="font-size:17px">${g.s.king} · ${turn.year}년</div><h2 style="font-size:${G.length>1?26:32}px">${esc(turn.title)} · 모둠들의 선택</h2></div><div style="width:${G.length>1?100:140}px">${eventArt(turn.art)}</div></div>
-      ${distHTML(room, room.turn, null, g.s.id)}
-      <div class="real" style="font-size:${G.length>1?15:17}px"><b>실제 역사에서는</b> ${esc(turn.real.text)}</div>
+    const anyMatch=g.teams.some(t=>{ const l=t.log.find(x=>x.t===room.turn); return l&&l.real; });
+    return `<div class="card stack"><div class="evscene" style="border:none; grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)">${eventScene(turn.art, turn.war)}<div><div class="yr" style="font-size:17px">${g.s.king} · ${turn.year}년</div><h2 style="font-size:${G.length>1?26:32}px">${esc(turn.title)} · 모둠들의 선택</h2></div></div>
+      <div data-at="${300+gi*400}" data-fx="chips">${distAnimHTML(room, room.turn, null, g.s.id)}</div>
+      ${realFlipHTML(turn, anyMatch, null, true)}
       ${achs||crises?`<div class="row">${achs}${crises}</div>`:''}${cardsUsed(g.teams)}</div>`; }).join('');
-  $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack"><div class="feedbox" id="feed">${feedHTML()}</div>${blocks}
+  $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack" id="rv"><div class="feedbox" id="feed">${feedHTML()}</div>${blocks}
     <div style="display:grid; grid-template-columns:1fr 380px; gap:16px; align-items:start" class="rv">
       <div class="card"><h3 style="font-size:20px; margin-bottom:10px">각 나라의 모습</h3><div id="live">${gridHTML()}</div></div>
-      <div class="card"><h3 style="font-size:20px; margin-bottom:10px">순위</h3><div id="lb">${leaderboardHTML(room)}</div></div></div></div>`;
+      <div class="card"><h3 style="font-size:20px; margin-bottom:10px">순위</h3><div id="lbwrap"><div data-at="2200" data-fx="rank">${lbAnimHTML(room,null,room.turn)}</div></div></div></div></div>`;
+  runStages(document.getElementById('rv'));
 }
 
 /* ---------- 최종 ---------- */
@@ -195,6 +199,7 @@ document.addEventListener('click', e=>{
   if(t.dataset.sid){ pick=t.dataset.sid; document.querySelectorAll('.king').forEach(b=>b.setAttribute('aria-pressed', b.dataset.sid===pick)); return; }
   if(t.dataset.cmd) return cmd(t.dataset.cmd, t);
   const a=t.dataset.act;
+  if(a==='flipreal'){ const fc=t.closest('.flipcard'); FX.flip(fc, false); return; }
   if(a==='create'){ if(!pick) return fail('왕을 고르세요.'); t.disabled=true;
     API.post({action:'create', sid:pick==='free'?'':pick, cards:document.getElementById('cardson').checked, cls:document.getElementById('cls').value.trim()}).then(j=>{ if(!j.ok){ t.disabled=false; return fail(j.error); } H={code:j.code, hostKey:j.hostKey}; save(); ver=0; poll(); })
       .catch(()=>{ t.disabled=false; fail('서버에 연결하지 못했습니다. config.js의 서버 주소를 확인하세요.'); }); }
