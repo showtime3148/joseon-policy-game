@@ -70,7 +70,7 @@ function cardHTML(cd, o){
   return `<button type="button" class="pcard ${o.used?'used':''} ${o.dim?'dim':''}" data-card="${cd.id}" aria-pressed="${!!o.sel}" aria-haspopup="dialog">
     <span class="mod"><span>現代 <b>${esc(cd.modern)}</b></span></span>
     <span class="bd"><span class="jn">${esc(cd.name)}</span><span class="ds">${esc(cd.desc)}</span>
-    <span class="tags">${tagsOf(cd.eff)}${cd.later?'<span class="tag">몇 해 뒤 효과</span>':''}</span><span class="un">통합사회 · ${esc(cd.unit)}</span></span></button>`;
+    <span class="tags">${tagsOf(cd.eff)}${cd.later?'<span class="tag">몇 해 뒤 효과</span>':''}</span><span class="un">${esc(cd.unit)}</span></span></button>`;
 }
 
 /* 팝업 */
@@ -88,7 +88,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
 
 function effList(eff){ return Object.entries(eff).filter(([k,v])=>v).map(([k,v])=>`<span class="tag ${v>0?'up':'dn'}">${STATS[k].name} ${v>0?'▲':'▼'}</span>`).join(''); }
 function cardModalHTML(cd, foot){
-  return `<div class="mh"><div><small>현대 제도 카드 · 통합사회 ${esc(cd.unit)}</small><h2>${esc(cd.name)}</h2></div><button class="x" data-close aria-label="닫기">✕</button></div>
+  return `<div class="mh"><div><small>현대 제도 카드 · ${esc(cd.unit)}</small><h2>${esc(cd.name)}</h2></div><button class="x" data-close aria-label="닫기">✕</button></div>
   <div class="mbody">
     <div class="bridge"><div><span>現代 오늘날</span><b>${esc(cd.modern)}</b></div><div style="border:none;background:none;font-size:22px">→</div><div style="border-color:var(--jade)"><span>朝鮮 조선판</span><b style="color:var(--jade)">${esc(cd.name)}</b></div></div>
     <div class="sec2"><h4>어떤 정책인가요</h4><p>${esc(cd.desc)}</p></div>
