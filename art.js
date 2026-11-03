@@ -114,3 +114,22 @@ function eventArt(key){
   };
   return W+(A[key]||A.scroll)+'</svg>';
 }
+
+/* 조언자 초상화 */
+function advisorSVG(adv, locked){
+  const L=adv.look, skin=locked?'#3a332c':'#f2d7b6', robe=locked?'#2a241f':L.robe, ink=locked?'#1a1612':INK, gold=locked?'#2a241f':GOLD;
+  let hat='';
+  if(L.hat==='king') hat=`<path d="M38 30 h44 v-14 q-22 -10 -44 0Z" fill="${locked?ink:'#2a211a'}"/><rect x="34" y="28" width="52" height="6" rx="2" fill="${gold}"/><ellipse cx="34" cy="20" rx="8" ry="5" fill="${locked?ink:'#2a211a'}"/><ellipse cx="86" cy="20" rx="8" ry="5" fill="${locked?ink:'#2a211a'}"/>`;
+  if(L.hat==='gat') hat=`<ellipse cx="60" cy="30" rx="36" ry="6" fill="${ink}" opacity=".92"/><rect x="47" y="10" width="26" height="20" rx="4" fill="${ink}" opacity=".92"/>`;
+  if(L.hat==='helmet') hat=`<path d="M34 34 q26 -36 52 0Z" fill="${locked?ink:'#5a4a3a'}" stroke="${ink}"/><line x1="60" y1="2" x2="60" y2="-6" stroke="${locked?ink:RED}" stroke-width="3"/><path d="M56 2 q4 -10 8 0Z" fill="${locked?ink:RED}"/><rect x="30" y="32" width="60" height="5" fill="${gold}"/>`;
+  if(L.hat==='official') hat=`<path d="M40 32 v-16 q20 -10 40 0 v16Z" fill="${ink}"/><ellipse cx="34" cy="22" rx="9" ry="4" fill="${ink}"/><ellipse cx="86" cy="22" rx="9" ry="4" fill="${ink}"/>`;
+  if(L.hat==='scholar') hat=`<path d="M42 30 h36 l-4 -18 h-28Z" fill="${ink}"/><path d="M46 12 h28" stroke="${ink}" stroke-width="3"/>`;
+  return `<svg viewBox="0 -8 120 128" class="advsvg" role="img" aria-label="${locked?'잠긴 조언자':esc(adv.name)}">
+    <circle cx="60" cy="60" r="58" fill="${locked?'#4a4038':'#efe1c2'}" stroke="${locked?'#2a241f':GOLD}" stroke-width="3"/>
+    <path d="M22 118 q6 -40 38 -42 q32 2 38 42Z" fill="${robe}" stroke="${ink}" stroke-width="1.2"/>
+    <path d="M50 78 l10 16 l10 -16" fill="none" stroke="${locked?'#3a332c':'#f6edd7'}" stroke-width="3"/>
+    <ellipse cx="60" cy="52" rx="18" ry="21" fill="${skin}" stroke="${ink}" stroke-width="1.2"/>
+    ${locked?'<text x="60" y="62" text-anchor="middle" font-size="26" font-weight="800" fill="#8a7b66" font-family="serif">?</text>':`<path d="M50 48 q4 -3 8 0 M62 48 q4 -3 8 0" stroke="${ink}" stroke-width="1.4" fill="none"/><path d="M55 62 q5 3 10 0" stroke="${ink}" stroke-width="1.2" fill="none"/>`}
+    ${!locked&&L.beard?`<path d="M48 64 q12 22 24 0 q-2 12 -12 16 q-10 -4 -12 -16Z" fill="#2a211a" opacity=".85"/><path d="M52 60 q8 -3 16 0" stroke="#2a211a" stroke-width="2" fill="none"/>`:''}
+    ${hat}</svg>`;
+}

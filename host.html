@@ -37,6 +37,7 @@ main{max-width:1500px}
 <script src="config.js"></script>
 <script src="scenarios.js"></script>
 <script src="cards.js"></script>
+<script src="advisors.js"></script>
 <script src="core.js"></script>
 <script src="art.js"></script>
 <script src="common.js"></script>
@@ -69,6 +70,7 @@ function render(){
   ({lobby:vLobby, deciding:vDecide, revealed:vReveal, ended:vEnd})[room.phase]();
 }
 function live(){
+  const fb=document.getElementById('feed'); if(fb) fb.innerHTML=feedHTML();
   const gc=document.getElementById('gcount'); if(gc) gc.innerHTML=groupCount();
   const g=document.getElementById('live'); if(g) g.innerHTML=gridHTML();
   const c=document.getElementById('ctl'); if(c) c.innerHTML=ctlHTML();
@@ -137,6 +139,7 @@ function vDecide(){
     $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">${steps}
       <div class="card bigev">${eventArt(turn.art)}<div><div class="yr" style="font-size:18px">${turn.year}년 · ${s.king} 시대</div><h2>${esc(turn.title)}</h2><p>${esc(turn.text)}</p>${turn.war?'<p style="margin-top:10px"><span class="pill bad" style="font-size:15px">전쟁 · 국방력이 피해를 좌우합니다</span></p>':''}</div></div>
       <div class="hchoices">${turn.choices.map((c,i)=>`<div class="ch"><span class="lt">${'甲乙丙'[i]}</span><b>${esc(c.label)}</b><span>${esc(c.desc)}</span></div>`).join('')}</div>
+      <div class="feedbox" id="feed">${feedHTML()}</div>
       <div class="card"><h3 style="font-size:20px; margin-bottom:10px">모둠별 논의 현황</h3><div id="live">${gridHTML()}</div></div></div>`;
   } else {
     $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">${steps}
@@ -144,12 +147,17 @@ function vDecide(){
         <div class="row" style="align-items:flex-start; flex-wrap:nowrap"><div style="width:110px; flex:none">${eventArt(turn.art)}</div>
         <div><div class="yr">${g.s.king} · ${turn.year}년</div><h3 style="font-size:22px">${esc(turn.title)}</h3><p class="small" style="margin:4px 0 0">${esc(turn.text)}</p></div></div>
         <div class="small muted">${turn.choices.map((c,i)=>'甲乙丙'[i]+' '+esc(c.label)).join(' · ')}</div></div>`; }).join('')}</div>
+      <div class="feedbox" id="feed">${feedHTML()}</div>
       <div class="card"><h3 style="font-size:20px; margin-bottom:10px">모둠별 논의 현황</h3><div id="live">${gridHTML()}</div></div></div>`;
   }
   startTimer();
 }
 
 /* ---------- 결과 공개 ---------- */
+function feedHTML(){
+  const f=(room.feed||[]).slice(-4).reverse();
+  return f.length?f.map(e=>{ const a=advisorById(e.adv); return `<div class="fi ${e.kind==='unlock'?'unlock-k':''}"><div>${a?advisorSVG(a,false):''}</div><div>${esc(e.text)}</div></div>`; }).join(''):'';
+}
 function cardsUsed(teams){
   const rows=teams.map(t=>{ const l=t.log.find(x=>x.t===room.turn); const cd=l&&l.card&&cardById(l.card); return cd?`<div class="cardnote"><b>${esc(t.name)}</b> · 현대의 ${esc(cd.modern)} → 「${esc(cd.name)}」 <span class="small muted">${esc(cd.concept)}</span></div>`:''; }).join('');
   return rows?`<div class="stack" style="gap:6px"><h3 style="font-size:16px">이번에 시행된 현대 제도</h3>${rows}</div>`:'';
@@ -163,7 +171,7 @@ function vReveal(){
       ${distHTML(room, room.turn, null, g.s.id)}
       <div class="real" style="font-size:${G.length>1?15:17}px"><b>실제 역사에서는</b> ${esc(turn.real.text)}</div>
       ${achs||crises?`<div class="row">${achs}${crises}</div>`:''}${cardsUsed(g.teams)}</div>`; }).join('');
-  $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">${blocks}
+  $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack"><div class="feedbox" id="feed">${feedHTML()}</div>${blocks}
     <div style="display:grid; grid-template-columns:1fr 380px; gap:16px; align-items:start" class="rv">
       <div class="card"><h3 style="font-size:20px; margin-bottom:10px">각 나라의 모습</h3><div id="live">${gridHTML()}</div></div>
       <div class="card"><h3 style="font-size:20px; margin-bottom:10px">순위</h3><div id="lb">${leaderboardHTML(room)}</div></div></div></div>`;

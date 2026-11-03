@@ -20,6 +20,7 @@ function sheetOf(name, head) {
   return sh;
 }
 
+function feed(r, e) { e.at = Date.now(); r.feed = (r.feed || []).concat([e]).slice(-30); }
 function getRoom(code) {
   const c = CacheService.getScriptCache().get('room_' + code);
   if (c) return JSON.parse(c);
@@ -51,11 +52,11 @@ function putRoom(r, backup) {
 
 function publicRoom(r) {
   return {
-    code: r.code, sid: r.sid, cls: r.cls, cardsOn: r.cards !== false, phase: r.phase, turn: r.turn, total: TOTAL, ver: r.ver, openedAt: r.openedAt || null,
+    feed: (r.feed || []).slice(-8), code: r.code, sid: r.sid, cls: r.cls, cardsOn: r.cards !== false, phase: r.phase, turn: r.turn, total: TOTAL, ver: r.ver, openedAt: r.openedAt || null,
     teams: r.order.map(id => {
       const t = r.teams[id], g = t.game;
       return { id: t.id, sid: t.sid || r.sid, name: t.name, members: t.members, goal: t.goal || '', submitted: !!t.sub,
-        st: g.st, hist: g.hist, ach: g.ach, cards: g.cards || [], crises: g.crises, log: g.log, done: g.done, ending: g.ending, lateNotes: g.lateNotes || [],
+        st: g.st, hist: g.hist, ach: g.ach, cards: g.cards || [], advisors: g.advisors || { have: [], used: [] }, crises: g.crises, log: g.log, done: g.done, ending: g.ending, lateNotes: g.lateNotes || [],
         score: scoreOf(g), matches: realMatches(g), final: !!t.final };
     })
   };
@@ -68,7 +69,7 @@ function doGet(e) {
     if (!r) return out({ ok: false, error: '방을 찾을 수 없습니다. 코드를 확인하세요.' });
     if (p.ver && Number(p.ver) === r.ver) return out({ ok: true, same: true, ver: r.ver });
     const pub = publicRoom(r);
-    if (p.team && r.teams[p.team]) pub.mySub = r.teams[p.team].sub || null;
+    if (p.team && r.teams[p.team]) { const mt = r.teams[p.team]; pub.mySub = mt.sub || null; pub.myAdvice = mt.advice && mt.advice.turn === r.turn && r.phase === 'deciding' ? mt.advice.data : null; }
     return out({ ok: true, room: pub });
   }
   return out({ ok: true, msg: '조선 국정 회의 서버가 작동 중입니다.' });
@@ -108,6 +109,7 @@ function handle(d) {
     if (r.phase === 'ended') return { ok: false, error: '이미 끝난 방입니다.' };
     const id = rid(8, CODE_CHARS);
     const g = initGame(s);
+    starterAdvisor(g, s);
     // 늦게 들어온 모둠은 현재 사건부터 시작
     g.t = r.phase === 'revealed' ? r.turn + 1 : r.turn;
     for (let i = 0; i < g.t; i++) g.hist.push(Object.assign({}, g.st));
@@ -117,16 +119,28 @@ function handle(d) {
     return { ok: true, teamId: id };
   }
 
-  if (d.action === 'goal' || d.action === 'submit' || d.action === 'final' || d.action === 'scenario') {
+  if (d.action === 'goal' || d.action === 'submit' || d.action === 'final' || d.action === 'scenario' || d.action === 'advise') {
     const t = r.teams[d.teamId];
     if (!t) return { ok: false, error: '모둠 정보를 찾을 수 없습니다. 다시 참가하세요.' };
     if (d.action === 'scenario') {
       if (r.sid) return { ok: false, error: '이 방은 선생님이 시대를 정했습니다.' };
       if (r.phase !== 'lobby') return { ok: false, error: '사건이 시작된 뒤에는 바꿀 수 없습니다.' };
       if (!scen(d.sid)) return { ok: false, error: '시나리오가 없습니다.' };
-      t.sid = d.sid; t.game = initGame(scen(d.sid)); putRoom(r, true); return { ok: true };
+      t.sid = d.sid; t.game = initGame(scen(d.sid)); starterAdvisor(t.game, scen(d.sid)); putRoom(r, true); return { ok: true };
     }
     const s = tscen(r, t);
+    if (d.action === 'advise') {
+      if (r.phase !== 'deciding' || t.game.t !== r.turn) return { ok: false, error: '사건이 열려 있을 때만 조언을 청할 수 있습니다.' };
+      const adv = advisorById(d.advisor), A = t.game.advisors || { have: [], used: [] };
+      if (!adv || A.have.indexOf(adv.id) < 0) return { ok: false, error: '아직 만나지 못한 조언자입니다.' };
+      if (A.used.indexOf(adv.id) >= 0) return { ok: false, error: '이 조언자는 이미 조언을 마쳤습니다.' };
+      if (t.advice && t.advice.turn === r.turn) return { ok: false, error: '한 사건에는 한 명의 조언만 들을 수 있습니다.' };
+      A.used.push(adv.id); t.game.advisors = A;
+      t.advice = { turn: r.turn, data: buildAdvice(adv, s.turns[r.turn]) };
+      feed(r, { kind: 'advise', adv: adv.id, team: t.name, text: josa(adv.name, '이가') + ' ' + t.name + ' 모둠 앞에 나타나 조언하였습니다' });
+      putRoom(r, false);
+      return { ok: true, advice: t.advice.data };
+    }
     if (d.action === 'goal') { t.goal = String(d.goal || '').slice(0, 1000); putRoom(r, false); return { ok: true }; }
     if (d.action === 'submit') {
       if (r.phase !== 'deciding') return { ok: false, error: '지금은 어명을 받을 때가 아닙니다.' };
@@ -178,6 +192,8 @@ function handle(d) {
         if (g.t !== r.turn) return;
         const sub = t.sub || { choice: null, gov: { tax: 3, bud: { df: 1, lv: 1, cu: 1 } }, why: '(제출하지 않음)' };
         const l = playTurn(g, s, sub.choice, sub.gov, sub.why, sub.card);
+        l.unlocks = checkUnlocks(g);
+        l.unlocks.forEach(id => feed(r, { kind: 'unlock', adv: id, team: t.name, text: t.name + ' 모둠이 히든 조언자 ' + josa(advisorById(id).name, '을를') + ' 만났습니다' }));
         t.sub = null;
         rows.push([new Date(), r.code, r.cls, s.king, r.turn + 1, turn.year, turn.title, t.name, t.members, l.label, l.real ? 'O' : 'X', l.card ? CARDS.filter(x => x.id === l.card)[0].name : '', sub.gov.tax,
           sub.gov.bud.df + '/' + sub.gov.bud.lv + '/' + sub.gov.bud.cu, sub.why, g.st.tr, g.st.pp, g.st.cr, g.st.df, g.st.lv, g.st.cu, scoreOf(g)].map(clean));

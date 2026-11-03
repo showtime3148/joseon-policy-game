@@ -21,6 +21,7 @@
 <script src="config.js"></script>
 <script src="scenarios.js"></script>
 <script src="cards.js"></script>
+<script src="advisors.js"></script>
 <script src="core.js"></script>
 <script src="art.js"></script>
 <script src="common.js"></script>
@@ -51,7 +52,7 @@ function poll(){
     render();
   }).catch(()=>setConn(false)).finally(()=>{ timer=setTimeout(poll, 2500); });
 }
-function key(){ const m=me(); return [m.sid, room.phase, room.turn, m.submitted?1:0, m.final?1:0, editing?1:0].join(':'); }
+function key(){ const m=me(); return [m.sid, room.myAdvice?room.myAdvice.id:'', room.phase, room.turn, m.submitted?1:0, m.final?1:0, editing?1:0].join(':'); }
 function render(){
   if(!room){ shown=''; return vJoin(); }
   const s=myScen(), m=me();
@@ -103,7 +104,7 @@ function vLobby(){
         <label class="f" for="goal">가장 시급한 문제는 무엇이며, 어떤 지표를 먼저 살릴 것인가요?<textarea id="goal">${esc(L.goalDraft!=null?L.goalDraft:m.goal)}</textarea></label>
         <div class="row"><button class="btn jade" data-act="goal">국정 방향 저장</button><span class="small" id="gs">${m.goal?'저장됨':''}</span></div></div>
     </div>
-    <div class="side"><div class="card">${gaugesHTML(m.st)}</div></div></div>
+    <div class="side"><div class="card">${gaugesHTML(m.st)}</div>${(m.advisors&&m.advisors.have.length)?(()=>{ const a=advisorById(m.advisors.have[0]); return `<div class="unlock"><div class="p">${advisorSVG(a,false)}</div><div><div class="eyebrow" style="color:#f3d9a0">첫 히든 조언자</div><h3 style="font-size:19px">${esc(a.name)}</h3><p class="small" style="margin:4px 0 0">${esc(a.title)} · 사건 중에 한 번 조언을 청할 수 있습니다. 다른 조언자는 조건을 채우면 나타납니다.</p></div></div>`; })():''}</div></div>
     <div class="card stack"><h3 style="font-size:18px">입궐한 모둠</h3><div id="live">${othersHTML()}</div></div></div>`;
 }
 
@@ -128,6 +129,7 @@ function vDecide(){
         ${ch?`<p style="margin:0">선택: <b>${esc(ch.label)}</b> · 세금 ${TAX_TXT[sub.gov.tax]}${sub.card&&cardById(sub.card)?' · 現代 카드 <b>'+esc(cardById(sub.card).name)+'</b>':''}</p><p class="small muted" style="margin:0; max-width:60ch">${esc(sub.why)}</p>`:''}
         <p class="small muted" style="margin:0">선생님이 결과를 공개할 때까지 고칠 수 있습니다.</p>
         <button class="btn" data-act="edit">어명 고치기</button></div>
+      ${room.myAdvice?speechHTML(room.myAdvice):''}
       <div class="card"><h3 style="font-size:17px; margin-bottom:10px">다른 나라 현황</h3><div id="live">${othersHTML()}</div></div></div>
       <div class="side"><div class="card">${gaugesHTML(m.st)}</div></div></div>`;
     return;
@@ -135,6 +137,7 @@ function vDecide(){
   $app.innerHTML=`${head}
   <div class="choices" style="margin-top:14px">${turn.choices.map((c,i)=>`<button type="button" class="ch" data-pick="${c.id}" aria-pressed="${d.pick===c.id}"><span class="lt">${'甲乙丙'[i]}</span><b>${esc(c.label)}</b><span>${esc(c.desc)}</span><div class="tags">${tagsOf(c.eff)}</div></button>`).join('')}</div>
   <p class="hint">▲▼는 즉각적인 효과의 방향만 보여 줍니다. 크기와 몇 해 뒤의 효과는 숨겨져 있습니다.</p>
+  ${room.myAdvice?`<div style="margin-bottom:14px">${speechHTML(room.myAdvice)}</div>`:''}
   ${room.cardsOn?deckHTML(m,d):''}
   <div class="play"><div class="stack">
     <form class="card stack" id="act" novalidate>
@@ -145,6 +148,7 @@ function vDecide(){
   <div class="side">
     <div class="card"><h3 style="font-size:16px; margin-bottom:8px">우리 나라</h3>${kingdomSVG(m.st)}<div style="margin-top:10px" id="gg">${gaugesHTML(m.st, govEffect(d,m.st))}</div>
       <p class="hint" style="margin:8px 0 0">빗금은 세금·예산으로 이번 해에 변할 양입니다.</p></div>
+    ${advisorsHTML(m)}
     <div class="card stack"><h3 style="font-size:16px">국정 운영</h3>
       <div class="sl"><div class="h"><b><label for="tax">세금</label></b><span id="tx">${TAX_TXT[d.tax]}</span></div><input type="range" id="tax" min="1" max="5" step="1" value="${d.tax}"><div class="ticks"><span>가볍게(민심▲)</span><span>무겁게(국고▲)</span></div></div>
       <div class="sl"><div class="h"><b>예산 배분</b></div><div class="budget" id="bb"></div></div>
@@ -157,6 +161,19 @@ function deckHTML(m,d){
   return `<div class="card stack" style="margin-bottom:14px"><div class="row between"><div><h3 style="font-size:18px">현대 제도 카드 <span class="small muted" style="font-family:var(--body)">선택 사항 · 사건마다 1장</span></h3>
     <p class="small muted" style="margin:2px 0 0">오늘날의 경제·정치·법 제도를 조선에 맞게 바꾼 정책입니다. 사건의 대책과 함께 시행됩니다.</p></div><span class="pill ${left?'navy':'bad'}">남은 카드 ${left}/${CARD_LIMIT}</span></div>
     <div class="deck">${CARDS.map(cd=>cardHTML(cd,{sel:d.card===cd.id, used:used.includes(cd.id), dis:used.includes(cd.id)||(!left)})).join('')}</div></div>`;
+}
+function advisorsHTML(m){
+  const A=m.advisors||{have:[],used:[]}, used=A.used||[], heard=!!room.myAdvice;
+  return `<div class="card stack"><div class="row between"><h3 style="font-size:16px">히든 조언자</h3><span class="small muted">${A.have.length}/${ADVISORS.length}명</span></div>
+    <p class="hint" style="margin:0">조언자는 자기 분야의 숨은 효과를 알려 줍니다. 한 사건에 한 명, 조언자마다 한 번만 부를 수 있습니다.</p>
+    <div class="advs">${ADVISORS.map(a=>{ const have=A.have.includes(a.id), u=used.includes(a.id), ready=have&&!u&&!heard;
+      return `<button type="button" class="adv ${u?'used':''} ${ready?'ready':''}" ${ready?`data-adv="${a.id}"`:'disabled'} title="${have?esc(a.name+' · '+a.title):esc(a.hint)}">${advisorSVG(a,!have)}<b>${have?esc(a.name):'???'}</b><span class="muted">${have?(u?'조언 마침':ready?'조언 청하기':'다음 사건에'):'잠김'}</span></button>`; }).join('')}</div>
+    <div class="small muted" id="advhint"></div></div>`;
+}
+function speechHTML(ad){
+  const a=advisorById(ad.id);
+  return `<div class="speech pop"><div class="who">${advisorSVG(a,false)}<b>${esc(a.name)}</b><span>${esc(a.title)}</span></div>
+    <div><p class="hello">“${esc(ad.hello)}”</p><ul>${ad.lines.map(l=>`<li><b>${l.mark} ${esc(l.label)}</b> · ${esc(l.text)}</li>`).join('')}</ul><p class="rec">${esc(ad.rec)}</p></div></div>`;
 }
 function updGov(){
   const d=L.draft, m=me(), b=d.bud, tot=(b.df+b.lv+b.cu)||1;
@@ -175,6 +192,7 @@ function vReveal(){
       ${l?`<div class="rec">${turn.year}년, ${s.king}께서 「${esc(turn.title)}」에 대하여 <b>${esc(l.label)}</b>을(를) 명하시고${l.card&&cardById(l.card)?`, 아울러 「${esc(cardById(l.card).name)}」을(를) 시행하시고`:''}, 세금은 ${TAX_TXT[l.tax]} 걷게 하셨다.</div>
       <div class="deltas">${SKEYS.map(k=>`<div class="dl"><div class="k">${STATS[k].name}</div><div class="n ${l.delta[k]>0?'up':l.delta[k]<0?'dn':'z'}">${sg(l.delta[k])}</div><div class="small muted num">${Math.round(m.st[k])}</div></div>`).join('')}</div>
       ${l.notes.map(n=>`<div class="note ${n.type}">${n.type==='later'?'뒤늦게 나타난 효과: ':''}${esc(n.text)}</div>`).join('')}
+      ${(l.unlocks||[]).map(id=>{ const a=advisorById(id); return `<div class="unlock pop"><div class="p">${advisorSVG(a,false)}</div><div><div class="eyebrow" style="color:#f3d9a0">히든 조언자 해금</div><h3>${esc(a.name)} · ${esc(a.title)}</h3><p style="margin:4px 0 0">“${esc(a.hello)}”</p></div></div>`; }).join('')}
       ${l.ach?`<div><span class="ach pop">業 업적 달성 · ${esc(l.ach)}</span></div>`:''}${l.card&&cardById(l.card)?`<div class="cardnote"><b>현대의 ${esc(cardById(l.card).modern)}</b> → 조선의 「${esc(cardById(l.card).name)}」 · ${esc(cardById(l.card).concept)} <span class="small muted">(통합사회 · ${esc(cardById(l.card).unit)})</span></div>`:''}`:'<p class="muted">이번 사건에는 참여하지 않았습니다.</p>'}
     </div>
     <div class="card stack"><h3 style="font-size:18px">${room.sid?'모둠들의 선택과 실제 역사':esc(s.king)+' 시대를 고른 모둠들의 선택과 실제 역사'}</h3>${distHTML(room, room.turn, m.id, m.sid)}
@@ -257,7 +275,13 @@ document.addEventListener('submit', e=>{
   }
 });
 document.addEventListener('click', e=>{
-  const t=e.target.closest('[data-pick],[data-act],[data-card]'); if(!t||t.disabled) return;
+  const t=e.target.closest('[data-pick],[data-act],[data-card],[data-adv]'); if(!t||t.disabled) return;
+  if(t.dataset.adv){ const a=advisorById(t.dataset.adv), h=document.getElementById('advhint');
+    if(t.dataset.confirm!=='1'){ document.querySelectorAll('[data-adv]').forEach(b=>{ b.dataset.confirm=''; }); t.dataset.confirm='1'; h.innerHTML='<b>'+esc(a.name)+'</b>에게 조언을 청할까요? 이번 게임에서 한 번뿐입니다. 한 번 더 누르면 부릅니다.'; return; }
+    t.disabled=true; h.textContent=josa(a.name,'을를')+' 부르는 중…';
+    API.post({action:'advise', code:L.code, teamId:L.teamId, advisor:a.id}).then(j=>{ if(!j.ok){ h.textContent=j.error; t.disabled=false; return; } room.myAdvice=j.advice; ver=0; shown=''; render(); poll(); })
+      .catch(()=>{ h.textContent='부르지 못했습니다. 다시 눌러 주세요.'; t.disabled=false; });
+    return; }
   if(t.dataset.card){ L.draft.card = L.draft.card===t.dataset.card ? null : t.dataset.card; save(); document.querySelectorAll('.pcard').forEach(b=>b.setAttribute('aria-pressed', b.dataset.card===L.draft.card)); return; }
   if(t.dataset.pick){ L.draft.pick=t.dataset.pick; save(); document.querySelectorAll('.ch').forEach(b=>b.setAttribute('aria-pressed', b.dataset.pick===L.draft.pick)); return; }
   const a=t.dataset.act;
