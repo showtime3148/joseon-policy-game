@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>조선 국정 회의 · 교사 화면</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<style>
+/* 교실 프로젝터용: 큰 글씨, 한 화면에 모든 모둠 */
+main{max-width:1500px}
+.kings{display:grid; grid-template-columns:repeat(5,1fr); gap:12px}
+.king{display:flex; flex-direction:column; gap:6px; text-align:left; cursor:pointer; background:var(--card); border:1.5px solid var(--line); border-radius:8px; padding:14px; border-top:5px solid var(--navy)}
+.king:hover{border-color:var(--red)} .king[aria-pressed="true"]{border-color:var(--red); border-top-color:var(--red); box-shadow:0 0 0 3px var(--red-soft)}
+.king h3{font-size:24px} .king p{margin:0; font-size:13px; color:var(--muted); line-height:1.5}
+.ctrl{position:sticky; top:52px; z-index:4; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin-bottom:14px; box-shadow:0 4px 12px rgba(60,40,10,.08)}
+.timer{font-family:var(--display); font-weight:800; font-size:26px; font-variant-numeric:tabular-nums}
+.bigev{display:grid; grid-template-columns:260px 1fr; gap:22px; align-items:center; border-left:8px solid var(--red)}
+.bigev h2{font-size:38px; margin:4px 0 10px} .bigev p{font-size:20px; line-height:1.75; margin:0; max-width:56ch}
+.hchoices{display:grid; grid-template-columns:repeat(3,1fr); gap:12px}
+.hchoices .ch{cursor:default} .hchoices .ch b{font-size:19px}
+.podium{display:grid; grid-template-columns:1fr 1.15fr 1fr; gap:14px; align-items:end}
+.pd{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; text-align:center}
+.pd .pl{font-family:var(--display); font-size:40px; font-weight:800}
+.pd.p1{border:3px solid var(--gold)} .pd.p1 .pl{color:var(--gold)}
+.joinbox{display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:center}
+@media (max-width:1000px){ .kings{grid-template-columns:repeat(2,1fr)} .bigev{grid-template-columns:1fr} .hchoices,.podium,.joinbox{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<header class="top"><div class="top-in"><div><b>朝鮮 國政 會議</b> <span class="sub">교사 화면</span></div><div class="row"><span class="sub" id="who"></span><span class="conn" id="conn"><i></i> 대기</span></div></div></header>
+<main id="app"></main>
+<script src="config.js"></script>
+<script src="scenarios.js"></script>
+<script src="core.js"></script>
+<script src="art.js"></script>
+<script src="common.js"></script>
+<script>
+const KEY='joseon-host-v2';
+const $app=document.getElementById('app');
+let H=load(), room=null, ver=0, shown='', timer=null, tick=null, pick=null;
+function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(H)); }catch(e){} }
+function joinUrl(){ return location.origin + location.pathname.replace(/host\.html$/,''); }
+function fail(m){ const e=document.getElementById('err'); if(e) e.textContent=m; }
+
+function poll(){
+  clearTimeout(timer);
+  if(!H.code) return;
+  API.state(H.code, ver).then(j=>{ setConn(true);
+    if(!j.ok){ if(/찾을 수 없/.test(j.error||'')){ H={}; save(); room=null; render(); } return; }
+    if(j.same) return; room=j.room; ver=room.ver; render();
+  }).catch(()=>setConn(false)).finally(()=>{ timer=setTimeout(poll, 2000); });
+}
+function render(){
+  if(!room){ shown=''; return vSetup(); }
+  const s=scenOf(room);
+  document.getElementById('who').textContent = s.king+' 시대 · 방 '+room.code+(room.cls?' · '+room.cls:'');
+  const k=room.phase+':'+room.turn;
+  if(k===shown){ live(); return; }
+  shown=k;
+  ({lobby:vLobby, deciding:vDecide, revealed:vReveal, ended:vEnd})[room.phase]();
+}
+function live(){
+  const g=document.getElementById('live'); if(g) g.innerHTML=gridHTML();
+  const c=document.getElementById('ctl'); if(c) c.innerHTML=ctlHTML();
+  const lb=document.getElementById('lb'); if(lb) lb.innerHTML=leaderboardHTML(room);
+}
+function gridHTML(){ return room.teams.length ? '<div class="teams">'+room.teams.map(t=>teamCard(room,t,{members:true})).join('')+'</div>' : '<p class="muted">아직 입궐한 모둠이 없습니다.</p>'; }
+function cmd(c, btn){
+  if(btn){ btn.disabled=true; }
+  API.post({action:'host', code:H.code, hostKey:H.hostKey, cmd:c}).then(j=>{ if(!j.ok){ alertBox(j.error); if(btn) btn.disabled=false; return; } ver=0; poll(); })
+    .catch(()=>{ alertBox('서버에 연결하지 못했습니다.'); if(btn) btn.disabled=false; });
+}
+function alertBox(m){ const e=document.getElementById('hmsg'); if(e){ e.textContent=m; } }
+function ctlHTML(){
+  const s=scenOf(room), n=room.teams.filter(t=>t.submitted).length, N=room.teams.length;
+  let left='', right='';
+  if(room.phase==='lobby'){ left=`<span class="pill navy">입궐한 모둠 ${N}</span>`; right=`<button class="btn primary big" data-cmd="open" ${N?'':'disabled'}>첫 사건 열기</button>`; }
+  if(room.phase==='deciding'){ left=`<span class="timer" id="timer">00:00</span><span class="pill ${n===N?'good':'navy'}" style="font-size:15px">어명 제출 ${n}/${N}</span>`;
+    right=`<button class="btn primary big" data-cmd="reveal">${n<N?'결과 공개 ('+(N-n)+'모둠 미제출)':'결과 공개'}</button>`; }
+  if(room.phase==='revealed'){ const last=room.turn+1>=s.turns.length; left=`<span class="pill good" style="font-size:15px">사건 ${room.turn+1}/${s.turns.length} 결과</span>`;
+    right=`<button class="btn primary big" data-cmd="open">${last?'최종 결과 보기':'다음 사건 열기'}</button>`; }
+  if(room.phase==='ended'){ const f=room.teams.filter(t=>t.final).length; left=`<span class="pill navy" style="font-size:15px">성찰 제출 ${f}/${N}</span>`; right=`<button class="btn" data-act="newroom">새 방 만들기</button>`; }
+  return `<div class="row">${left}<span class="small" id="hmsg" style="color:var(--bad)"></span></div><div class="row">${right}</div>`;
+}
+function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const e=document.getElementById('timer'); if(!e||!room||!room.openedAt) return;
+  const sec=Math.max(0,Math.floor((Date.now()-room.openedAt)/1000)); e.textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0'); }, 500); }
+
+/* ---------- 방 만들기 ---------- */
+function vSetup(){
+  document.getElementById('who').textContent='';
+  $app.innerHTML=`<div class="stack">
+    <div class="banner">${bannerSVG(200)}<div class="over"><h1>朝鮮 國政 會議</h1><p>교사 화면 · 방을 만들고 교실 화면에 띄우세요</p></div></div>
+    ${!serverUrl()?'<div class="note crisis">config.js에 서버 주소(SERVER_URL)가 없습니다. README의 설정 순서를 따라 주세요.</div>':''}
+    <div class="card stack"><h2 style="font-size:22px">어느 왕의 시대로 들어갈까요?</h2>
+      <div class="kings">${SCENARIOS.map(s=>`<button type="button" class="king" data-sid="${s.id}" aria-pressed="${pick===s.id}"><span class="small muted">재위 ${s.reign}</span><h3>${s.king}</h3><b style="font-size:14px">${esc(s.title)}</b><p>${esc(s.lead)}</p></button>`).join('')}</div>
+      <div class="row"><label class="f" for="cls" style="flex:0 1 200px">학급<input type="text" id="cls" placeholder="예: 2-1" autocomplete="off"></label>
+        <button class="btn primary big" data-act="create" style="align-self:flex-end">방 만들기</button></div>
+      <div class="err" id="err"></div></div>
+    <details class="card"><summary style="cursor:pointer;font-weight:700">수업 진행 방법</summary><ol>
+      <li>왕을 고르고 방을 만들면 네 글자 방 코드가 나옵니다. 교실 화면에 띄워 두세요.</li>
+      <li>모둠은 태블릿·노트북에서 <b>${esc(joinUrl())}</b> 에 들어가 방 코드로 입궐합니다.</li>
+      <li><b>첫 사건 열기</b>를 누르면 모든 모둠에 같은 사건이 나타납니다. 모둠은 토의해 대책·세금·예산·근거를 올립니다.</li>
+      <li>제출 현황이 실시간으로 보입니다. <b>결과 공개</b>를 누르면 모든 모둠의 선택, 실제 역사, 나라 모습, 순위가 함께 공개됩니다. 미제출 모둠은 "어명을 내리지 못함"으로 처리됩니다.</li>
+      <li>7개 사건이 끝나면 각 모둠이 성찰을 제출합니다. 모든 기록은 구글 시트의 <b>기록</b>·<b>제출</b> 탭에 쌓입니다.</li></ol></details>
+  </div>`;
+}
+
+/* ---------- 대기실 ---------- */
+function vLobby(){
+  const s=scenOf(room);
+  $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">
+    <div class="card joinbox"><div><div class="eyebrow">방 코드</div><div class="code">${room.code}</div><p class="muted" style="margin:8px 0 0; font-size:17px">접속 주소 <b style="color:var(--ink)">${esc(joinUrl())}</b></p></div>
+      <div><div class="eyebrow">재위 ${s.reign}</div><h2 style="font-size:30px">${s.king} · ${esc(s.title)}</h2><p style="font-size:16px; line-height:1.8; margin:6px 0 0">${esc(s.lead)}</p></div></div>
+    <div class="card"><h3 style="font-size:20px; margin-bottom:10px">입궐한 모둠</h3><div id="live">${gridHTML()}</div></div></div>`;
+}
+
+/* ---------- 결정 중 ---------- */
+function vDecide(){
+  const s=scenOf(room), turn=s.turns[room.turn];
+  $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">
+    <div class="row between"><div class="steps">${s.turns.map((_,i)=>`<i class="${i<room.turn?'d':i===room.turn?'n':''}"></i>`).join('')}</div><span class="muted">방 코드 <b style="color:var(--red); letter-spacing:.15em">${room.code}</b></span></div>
+    <div class="card bigev">${eventArt(turn.art)}<div><div class="yr" style="font-size:18px">${turn.year}년 · 사건 ${room.turn+1}/${s.turns.length}</div><h2>${esc(turn.title)}</h2><p>${esc(turn.text)}</p>${turn.war?'<p style="margin-top:10px"><span class="pill bad" style="font-size:15px">전쟁 · 국방력이 피해를 좌우합니다</span></p>':''}</div></div>
+    <div class="hchoices">${turn.choices.map((c,i)=>`<div class="ch"><span class="lt">${'甲乙丙'[i]}</span><b>${esc(c.label)}</b><span>${esc(c.desc)}</span></div>`).join('')}</div>
+    <div class="card"><h3 style="font-size:20px; margin-bottom:10px">모둠별 논의 현황</h3><div id="live">${gridHTML()}</div></div></div>`;
+  startTimer();
+}
+
+/* ---------- 결과 공개 ---------- */
+function vReveal(){
+  const s=scenOf(room), turn=s.turns[room.turn];
+  const achs=room.teams.map(t=>{ const l=t.log.find(x=>x.t===room.turn); return l&&l.ach?`<span class="ach pop">業 ${esc(t.name)} · ${esc(l.ach)}</span>`:''; }).join('');
+  const crises=room.teams.map(t=>{ const l=t.log.find(x=>x.t===room.turn); return l?l.notes.filter(n=>n.type==='crisis').map(n=>`<span class="pill bad">${esc(t.name)} · ${esc(n.text)}</span>`).join(''):''; }).join('');
+  $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">
+    <div class="card stack"><div class="row between"><div><div class="yr" style="font-size:17px">${turn.year}년</div><h2 style="font-size:32px">${esc(turn.title)} · 모둠들의 선택</h2></div><div style="width:140px">${eventArt(turn.art)}</div></div>
+      ${distHTML(room, room.turn)}
+      <div class="real" style="font-size:17px"><b>실제 역사에서는</b> ${esc(turn.real.text)}</div>
+      ${achs||crises?`<div class="row">${achs}${crises}</div>`:''}</div>
+    <div class="play" style="display:grid; grid-template-columns:1fr 380px; gap:16px; align-items:start">
+      <div class="card"><h3 style="font-size:20px; margin-bottom:10px">각 나라의 모습</h3><div id="live">${gridHTML()}</div></div>
+      <div class="card"><h3 style="font-size:20px; margin-bottom:10px">순위</h3><div id="lb">${leaderboardHTML(room)}</div></div></div></div>`;
+}
+
+/* ---------- 최종 ---------- */
+function vEnd(){
+  const s=scenOf(room), list=ranked(room), top=[list[1],list[0],list[2]];
+  $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">
+    <div class="banner">${bannerSVG(170)}<div class="over"><div class="eyebrow" style="color:#f3d9a0">${s.king} 치세 종료</div><h1>최고의 국정을 펼친 모둠은?</h1></div></div>
+    <div class="podium">${top.map((t,i)=>t?`<div class="pd ${i===1?'p1':''}"><div class="pl">${[2,1,3][i]}위</div><h3 style="font-size:24px">${esc(t.name)}</h3><div class="sc" style="font-family:var(--display);font-size:30px;font-weight:800;color:var(--red)">${t.score}점</div>${kingdomSVG(t.st)}<p class="small" style="margin:6px 0 0">${t.ending?esc(t.ending.title)+' · ':''}업적 ${t.ach.length} · 실제 역사 일치 ${t.matches}/${t.log.length}</p></div>`:'<div></div>').join('')}</div>
+    <div class="card"><h3 style="font-size:20px; margin-bottom:10px">전체 순위</h3><div id="lb">${leaderboardHTML(room)}</div></div>
+    <div class="card"><h3 style="font-size:20px; margin-bottom:10px">각 나라의 최종 모습</h3><div id="live">${gridHTML()}</div></div></div>`;
+}
+
+/* ---------- 이벤트 ---------- */
+document.addEventListener('click', e=>{
+  const t=e.target.closest('[data-sid],[data-act],[data-cmd]'); if(!t||t.disabled) return;
+  if(t.dataset.sid){ pick=t.dataset.sid; document.querySelectorAll('.king').forEach(b=>b.setAttribute('aria-pressed', b.dataset.sid===pick)); return; }
+  if(t.dataset.cmd) return cmd(t.dataset.cmd, t);
+  const a=t.dataset.act;
+  if(a==='create'){ if(!pick) return fail('왕을 고르세요.'); t.disabled=true;
+    API.post({action:'create', sid:pick, cls:document.getElementById('cls').value.trim()}).then(j=>{ if(!j.ok){ t.disabled=false; return fail(j.error); } H={code:j.code, hostKey:j.hostKey}; save(); ver=0; poll(); })
+      .catch(()=>{ t.disabled=false; fail('서버에 연결하지 못했습니다. config.js의 서버 주소를 확인하세요.'); }); }
+  if(a==='newroom'){ H={}; save(); room=null; ver=0; render(); }
+});
+render(); poll();
+</script>
+</body>
+</html>

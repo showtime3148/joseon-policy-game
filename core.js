@@ -23,7 +23,8 @@ function govEffect(gov, st){
 function applyStats(st, d){ for(const k of SKEYS) st[k] = clamp(Math.round((st[k] + (d[k]||0))*10)/10, 0, 100); }
 
 function playTurn(g, sc, choiceId, gov, why){
-  const turn = sc.turns[g.t], ch = turn.choices.find(c => c.id === choiceId);
+  const turn = sc.turns[g.t];
+  const ch = turn.choices.find(c => c.id === choiceId) || {id:'-', label:'어명을 내리지 못함', eff:{cr:-4, pp:-3}};
   const before = Object.assign({}, g.st), notes = [], d = {};
   addTo(d, ch.eff);
   addTo(d, govEffect(gov, g.st));
@@ -48,7 +49,7 @@ function playTurn(g, sc, choiceId, gov, why){
 
   const delta = {}; for(const k of SKEYS) delta[k] = Math.round((g.st[k] - before[k])*10)/10;
   g.log.push({t:g.t, year:turn.year, title:turn.title, choice:choiceId, label:ch.label, tax:gov.tax, bud:Object.assign({}, gov.bud),
-              why:why, delta:delta, notes:notes, ach:newAch, real:turn.real.pick === choiceId});
+              why:why||'', delta:delta, notes:notes, ach:newAch, real:turn.real.pick === ch.id});
   g.t++;
   g.hist.push(Object.assign({}, g.st));
   if(g.t >= sc.turns.length) finishGame(g, sc);
@@ -75,4 +76,4 @@ function scoreOf(g){
 }
 function realMatches(g){ return g.log.filter(l => l.real).length; }
 
-if(typeof module !== 'undefined') module.exports = {SKEYS, initGame, playTurn, scoreOf, govEffect, realMatches, TAX_LABEL};
+if(typeof module !== 'undefined' && module.exports) module.exports = {SKEYS, initGame, playTurn, scoreOf, govEffect, realMatches, TAX_LABEL};
