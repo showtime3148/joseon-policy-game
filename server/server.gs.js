@@ -4,8 +4,8 @@
  */
 const ROOM_TTL = 21600; // 6시간
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const LOG_HEAD = ['기록 시각','방','학급','왕','사건 번호','연도','사건','모둠','모둠원','선택','실제와 일치','세금','예산(국방/민생/문화)','결정 근거','국고','민심','왕권','국방','민생','문화','점수'];
-const FINAL_HEAD = ['제출 시각','방','학급','왕','모둠','모둠원','점수','순위','실제 역사 일치','결말','국고','민심','왕권','국방','민생','문화','업적','위기','국정 방향','성찰1: 실제와 다른 선택','성찰2: 실제 왕 평가','성찰3: 우리 치세 실록'];
+const LOG_HEAD = ['기록 시각','방','학급','왕','사건 번호','연도','사건','모둠','모둠원','선택','실제와 일치','현대 제도 카드','세금','예산(국방/민생/문화)','결정 근거','국고','민심','왕권','국방','민생','문화','점수'];
+const FINAL_HEAD = ['제출 시각','방','학급','왕','모둠','모둠원','점수','순위','실제 역사 일치','결말','국고','민심','왕권','국방','민생','문화','업적','위기','사용한 카드','국정 방향','성찰1: 실제와 다른 선택','성찰2: 실제 왕 평가','성찰3: 우리 치세 실록'];
 
 function out(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
 function clean(v) { return (typeof v === 'string' && /^[=+\-@]/.test(v)) ? "'" + v : v; }
@@ -51,11 +51,11 @@ function putRoom(r, backup) {
 
 function publicRoom(r) {
   return {
-    code: r.code, sid: r.sid, cls: r.cls, phase: r.phase, turn: r.turn, total: TOTAL, ver: r.ver, openedAt: r.openedAt || null,
+    code: r.code, sid: r.sid, cls: r.cls, cardsOn: r.cards !== false, phase: r.phase, turn: r.turn, total: TOTAL, ver: r.ver, openedAt: r.openedAt || null,
     teams: r.order.map(id => {
       const t = r.teams[id], g = t.game;
       return { id: t.id, sid: t.sid || r.sid, name: t.name, members: t.members, goal: t.goal || '', submitted: !!t.sub,
-        st: g.st, hist: g.hist, ach: g.ach, crises: g.crises, log: g.log, done: g.done, ending: g.ending, lateNotes: g.lateNotes || [],
+        st: g.st, hist: g.hist, ach: g.ach, cards: g.cards || [], crises: g.crises, log: g.log, done: g.done, ending: g.ending, lateNotes: g.lateNotes || [],
         score: scoreOf(g), matches: realMatches(g), final: !!t.final };
     })
   };
@@ -88,7 +88,7 @@ function handle(d) {
   if (d.action === 'create') {
     if (d.sid && !scen(d.sid)) return { ok: false, error: '시나리오가 없습니다.' };
     let code; do { code = rid(4, CODE_CHARS); } while (CacheService.getScriptCache().get('room_' + code));
-    const r = { code: code, hostKey: rid(16, CODE_CHARS), sid: d.sid || '', cls: String(d.cls || ''), phase: 'lobby', turn: 0, teams: {}, order: [], created: Date.now() };
+    const r = { code: code, hostKey: rid(16, CODE_CHARS), sid: d.sid || '', cls: String(d.cls || ''), cards: d.cards !== false, phase: 'lobby', turn: 0, teams: {}, order: [], created: Date.now() };
     putRoom(r, true);
     return { ok: true, code: code, hostKey: r.hostKey };
   }
@@ -133,8 +133,16 @@ function handle(d) {
       if (Number(d.turn) !== r.turn) return { ok: false, error: '이미 지나간 사건입니다.' };
       const ch = s.turns[r.turn].choices.filter(c => c.id === d.choice)[0];
       if (!ch) return { ok: false, error: '대책을 고르세요.' };
+      let card = null;
+      if (d.card) {
+        const cd = CARDS.filter(x => x.id === d.card)[0], used = t.game.cards || [];
+        if (r.cards === false || !cd) return { ok: false, error: '쓸 수 없는 카드입니다.' };
+        if (used.indexOf(cd.id) >= 0) return { ok: false, error: '이미 쓴 카드입니다.' };
+        if (used.length >= CARD_LIMIT) return { ok: false, error: '카드는 ' + CARD_LIMIT + '장까지만 쓸 수 있습니다.' };
+        card = cd.id;
+      }
       const gov = d.gov || {}, b = gov.bud || {};
-      t.sub = { choice: ch.id, gov: { tax: Math.max(1, Math.min(5, Number(gov.tax) || 3)), bud: { df: Math.max(0, +b.df || 0), lv: Math.max(0, +b.lv || 0), cu: Math.max(0, +b.cu || 0) } }, why: String(d.why || '').slice(0, 1000), at: Date.now() };
+      t.sub = { choice: ch.id, gov: { tax: Math.max(1, Math.min(5, Number(gov.tax) || 3)), bud: { df: Math.max(0, +b.df || 0), lv: Math.max(0, +b.lv || 0), cu: Math.max(0, +b.cu || 0) } }, why: String(d.why || '').slice(0, 1000), card: card, at: Date.now() };
       putRoom(r, false);
       return { ok: true };
     }
@@ -144,7 +152,7 @@ function handle(d) {
       const ranked = r.order.map(id => r.teams[id]).sort((a, b) => scoreOf(b.game) - scoreOf(a.game));
       const g = t.game;
       sheetOf('제출', FINAL_HEAD).appendRow([new Date(), r.code, r.cls, s.king, t.name, t.members, scoreOf(g), ranked.indexOf(t) + 1, realMatches(g) + '/' + g.log.length,
-        g.ending ? g.ending.title : '', g.st.tr, g.st.pp, g.st.cr, g.st.df, g.st.lv, g.st.cu, g.ach.join(', '), g.crises.length, t.goal, t.final.ref1, t.final.ref2, t.final.ref3].map(clean));
+        g.ending ? g.ending.title : '', g.st.tr, g.st.pp, g.st.cr, g.st.df, g.st.lv, g.st.cu, g.ach.join(', '), g.crises.length, (g.cards || []).map(id => CARDS.filter(x => x.id === id)[0].name).join(', '), t.goal, t.final.ref1, t.final.ref2, t.final.ref3].map(clean));
       return { ok: true };
     }
   }
@@ -169,9 +177,9 @@ function handle(d) {
         const t = r.teams[id], g = t.game, s = tscen(r, t), turn = s.turns[r.turn];
         if (g.t !== r.turn) return;
         const sub = t.sub || { choice: null, gov: { tax: 3, bud: { df: 1, lv: 1, cu: 1 } }, why: '(제출하지 않음)' };
-        const l = playTurn(g, s, sub.choice, sub.gov, sub.why);
+        const l = playTurn(g, s, sub.choice, sub.gov, sub.why, sub.card);
         t.sub = null;
-        rows.push([new Date(), r.code, r.cls, s.king, r.turn + 1, turn.year, turn.title, t.name, t.members, l.label, l.real ? 'O' : 'X', sub.gov.tax,
+        rows.push([new Date(), r.code, r.cls, s.king, r.turn + 1, turn.year, turn.title, t.name, t.members, l.label, l.real ? 'O' : 'X', l.card ? CARDS.filter(x => x.id === l.card)[0].name : '', sub.gov.tax,
           sub.gov.bud.df + '/' + sub.gov.bud.lv + '/' + sub.gov.bud.cu, sub.why, g.st.tr, g.st.pp, g.st.cr, g.st.df, g.st.lv, g.st.cu, scoreOf(g)].map(clean));
       });
       r.phase = 'revealed';

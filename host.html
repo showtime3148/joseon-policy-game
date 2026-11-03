@@ -36,6 +36,7 @@ main{max-width:1500px}
 <main id="app"></main>
 <script src="config.js"></script>
 <script src="scenarios.js"></script>
+<script src="cards.js"></script>
 <script src="core.js"></script>
 <script src="art.js"></script>
 <script src="common.js"></script>
@@ -104,6 +105,7 @@ function vSetup(){
       <button type="button" class="king" data-sid="free" aria-pressed="${pick==='free'}" style="border-top-color:var(--jade)"><h3>모둠이 직접 선택</h3><p>모둠마다 다스릴 왕을 고릅니다. 사건은 모든 모둠이 함께 진행하고, 결과 공개 때 시대별로 비교합니다.</p></button>
       <div class="kings">${SCENARIOS.map(s=>`<button type="button" class="king" data-sid="${s.id}" aria-pressed="${pick===s.id}"><span class="small muted">재위 ${s.reign}</span><h3>${s.king}</h3><b style="font-size:14px">${esc(s.title)}</b><p>${esc(s.lead)}</p></button>`).join('')}</div>
       <div class="row"><label class="f" for="cls" style="flex:0 1 200px">학급<input type="text" id="cls" placeholder="예: 2-1" autocomplete="off"></label>
+        <label class="row" style="align-self:flex-end; gap:6px; padding-bottom:10px"><input type="checkbox" id="cardson" checked> 현대 제도 카드 사용 <span class="hint">(통합사회 융합 · 모둠당 ${CARD_LIMIT}장)</span></label>
         <button class="btn primary big" data-act="create" style="align-self:flex-end">방 만들기</button></div>
       <div class="err" id="err"></div></div>
     <details class="card"><summary style="cursor:pointer;font-weight:700">수업 진행 방법</summary><ol>
@@ -122,7 +124,8 @@ function vLobby(){
     : `<div class="eyebrow">모둠별 왕 선택</div><h2 style="font-size:30px">각 모둠이 다스릴 왕을 고릅니다</h2><div class="row" style="margin-top:10px" id="gcount">${groupCount()}</div>`;
   $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">
     <div class="card joinbox"><div><div class="eyebrow">방 코드</div><div class="code">${room.code}</div><p class="muted" style="margin:8px 0 0; font-size:17px">접속 주소 <b style="color:var(--ink)">${esc(joinUrl())}</b></p></div><div>${info}</div></div>
-    <div class="card"><h3 style="font-size:20px; margin-bottom:10px">입궐한 모둠</h3><div id="live">${gridHTML()}</div></div></div>`;
+    <div class="card"><h3 style="font-size:20px; margin-bottom:10px">입궐한 모둠</h3><div id="live">${gridHTML()}</div></div>
+    ${room.cardsOn?`<div class="card stack"><h3 style="font-size:20px">현대 제도 카드 <span class="small muted" style="font-family:var(--body)">모둠마다 ${CARD_LIMIT}장까지, 사건마다 1장</span></h3><div class="deck">${CARDS.map(cd=>cardHTML(cd,{})).join('')}</div></div>`:''}</div>`;
 }
 function groupCount(){ return SCENARIOS.map(s=>{ const n=room.teams.filter(t=>t.sid===s.id).length; return `<span class="pill ${n?'navy':''}" style="font-size:14px">${s.king} ${n}</span>`; }).join(''); }
 
@@ -147,6 +150,10 @@ function vDecide(){
 }
 
 /* ---------- 결과 공개 ---------- */
+function cardsUsed(teams){
+  const rows=teams.map(t=>{ const l=t.log.find(x=>x.t===room.turn); const cd=l&&l.card&&cardById(l.card); return cd?`<div class="cardnote"><b>${esc(t.name)}</b> · 현대의 ${esc(cd.modern)} → 「${esc(cd.name)}」 <span class="small muted">${esc(cd.concept)}</span></div>`:''; }).join('');
+  return rows?`<div class="stack" style="gap:6px"><h3 style="font-size:16px">이번에 시행된 현대 제도</h3>${rows}</div>`:'';
+}
 function vReveal(){
   const G=groups(room);
   const blocks=G.map(g=>{ const turn=g.s.turns[room.turn];
@@ -155,7 +162,7 @@ function vReveal(){
     return `<div class="card stack"><div class="row between"><div><div class="yr" style="font-size:17px">${g.s.king} · ${turn.year}년</div><h2 style="font-size:${G.length>1?26:32}px">${esc(turn.title)} · 모둠들의 선택</h2></div><div style="width:${G.length>1?100:140}px">${eventArt(turn.art)}</div></div>
       ${distHTML(room, room.turn, null, g.s.id)}
       <div class="real" style="font-size:${G.length>1?15:17}px"><b>실제 역사에서는</b> ${esc(turn.real.text)}</div>
-      ${achs||crises?`<div class="row">${achs}${crises}</div>`:''}</div>`; }).join('');
+      ${achs||crises?`<div class="row">${achs}${crises}</div>`:''}${cardsUsed(g.teams)}</div>`; }).join('');
   $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">${blocks}
     <div style="display:grid; grid-template-columns:1fr 380px; gap:16px; align-items:start" class="rv">
       <div class="card"><h3 style="font-size:20px; margin-bottom:10px">각 나라의 모습</h3><div id="live">${gridHTML()}</div></div>
@@ -180,7 +187,7 @@ document.addEventListener('click', e=>{
   if(t.dataset.cmd) return cmd(t.dataset.cmd, t);
   const a=t.dataset.act;
   if(a==='create'){ if(!pick) return fail('왕을 고르세요.'); t.disabled=true;
-    API.post({action:'create', sid:pick==='free'?'':pick, cls:document.getElementById('cls').value.trim()}).then(j=>{ if(!j.ok){ t.disabled=false; return fail(j.error); } H={code:j.code, hostKey:j.hostKey}; save(); ver=0; poll(); })
+    API.post({action:'create', sid:pick==='free'?'':pick, cards:document.getElementById('cardson').checked, cls:document.getElementById('cls').value.trim()}).then(j=>{ if(!j.ok){ t.disabled=false; return fail(j.error); } H={code:j.code, hostKey:j.hostKey}; save(); ver=0; poll(); })
       .catch(()=>{ t.disabled=false; fail('서버에 연결하지 못했습니다. config.js의 서버 주소를 확인하세요.'); }); }
   if(a==='bots'){ t.disabled=true; addBots(H.code).then(()=>{ ver=0; poll(); }); return; }
   if(a==='newroom'){ H={}; save(); room=null; ver=0; render(); }

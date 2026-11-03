@@ -8,7 +8,7 @@ function addTo(d, e, k){ for(const s in e) d[s] = (d[s]||0) + e[s]*(k==null?1:k)
 
 function initGame(sc){
   return {sid:sc.id, t:0, st:Object.assign({}, sc.start), hist:[Object.assign({}, sc.start)],
-          pending:[], flags:{}, ach:[], crises:[], log:[], done:false, ending:null};
+          pending:[], flags:{}, ach:[], cards:[], crises:[], log:[], done:false, ending:null};
 }
 
 // 세금·예산 효과: gov = {tax:1~5, bud:{df,lv,cu}}
@@ -22,7 +22,7 @@ function govEffect(gov, st){
 
 function applyStats(st, d){ for(const k of SKEYS) st[k] = clamp(Math.round((st[k] + (d[k]||0))*10)/10, 0, 100); }
 
-function playTurn(g, sc, choiceId, gov, why){
+function playTurn(g, sc, choiceId, gov, why, cardId){
   const turn = sc.turns[g.t];
   const ch = turn.choices.find(c => c.id === choiceId) || {id:'-', label:'어명을 내리지 못함', eff:{cr:-4, pp:-3}};
   const before = Object.assign({}, g.st), notes = [], d = {};
@@ -30,6 +30,15 @@ function playTurn(g, sc, choiceId, gov, why){
   addTo(d, govEffect(gov, g.st));
   // 지연 효과 도착
   g.pending = g.pending.filter(p => { if(p.due === g.t){ addTo(d, p.eff); notes.push({type:'later', text:p.note}); return false; } return true; });
+  // 현대 제도 카드
+  let usedCard = null;
+  const card = cardId && typeof CARDS !== 'undefined' ? CARDS.find(c => c.id === cardId) : null;
+  g.cards = g.cards || [];
+  if(card && g.cards.indexOf(card.id) < 0 && g.cards.length < CARD_LIMIT){
+    addTo(d, card.eff);
+    if(card.later) card.later.forEach(l => g.pending.push({due:g.t + l.in, eff:l.eff, note:l.note, from:card.name}));
+    g.cards.push(card.id); usedCard = card.id;
+  }
   // 전쟁: 국방력에 따라 피해가 달라짐
   if(turn.war){
     if(g.st.df < 40){ addTo(d, {pp:-5, tr:-5, cr:-3}); notes.push({type:'war', text:'국방력이 약해 전쟁 피해가 컸습니다.'}); }
@@ -49,7 +58,7 @@ function playTurn(g, sc, choiceId, gov, why){
 
   const delta = {}; for(const k of SKEYS) delta[k] = Math.round((g.st[k] - before[k])*10)/10;
   g.log.push({t:g.t, year:turn.year, title:turn.title, choice:choiceId, label:ch.label, tax:gov.tax, bud:Object.assign({}, gov.bud),
-              why:why||'', delta:delta, notes:notes, ach:newAch, real:turn.real.pick === ch.id});
+              why:why||'', card:usedCard, delta:delta, notes:notes, ach:newAch, real:turn.real.pick === ch.id});
   g.t++;
   g.hist.push(Object.assign({}, g.st));
   if(g.t >= sc.turns.length) finishGame(g, sc);

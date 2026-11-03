@@ -312,6 +312,56 @@ const SCENARIOS = [
 }
 ];
 
+/* 현대 제도 카드 — 통합사회의 경제·정치·법 개념을 조선에 맞게 바꾼 카드
+ * unit: 통합사회 관련 단원, modern: 현대 제도 이름, name: 조선판 이름
+ * eff: 즉시 효과, later: 지연 효과(in 턴 뒤)
+ */
+const CARD_LIMIT = 3; // 한 모둠이 한 게임에서 쓸 수 있는 카드 수(한 사건에 1장)
+const CARDS = [
+  {id:'rate', unit:'시장 경제와 금융', modern:'중앙은행의 물가 안정 정책', name:'상평창 곡가 조절',
+   desc:'풍년에 곡식을 사들이고 흉년에 풀어 곡식값을 안정시킨다.', concept:'중앙은행이 금리·통화량을 조절해 물가를 안정시키듯, 나라가 곡식의 양을 조절해 값을 안정시킵니다.',
+   eff:{lv:5, pp:2, tr:-3}},
+  {id:'progtax', unit:'정의와 사회 불평등', modern:'누진세', name:'누진 전세(田稅)',
+   desc:'땅을 많이 가진 사람일수록 더 높은 비율로 세금을 걷는다.', concept:'소득이 많을수록 높은 세율을 매기는 누진세는 소득 재분배 효과가 있지만, 부유층의 반발을 부릅니다.',
+   eff:{tr:7, pp:5, cr:-6}},
+  {id:'basic', unit:'정의와 사회 불평등', modern:'사회 보장 제도(기본 소득)', name:'진휼 기본미',
+   desc:'모든 백성에게 기본 식량을 나누어 준다.', concept:'공공 부조·기본 소득은 최소한의 생활을 보장하지만 큰 재정이 필요합니다.',
+   eff:{pp:8, lv:4, tr:-10}},
+  {id:'checks', unit:'인권 보장과 헌법', modern:'권력 분립(견제와 균형)', name:'삼사(三司) 독립',
+   desc:'사헌부·사간원·홍문관이 왕과 대신을 마음껏 비판하게 한다.', concept:'입법·행정·사법을 나누어 서로 견제하면 권력 남용을 막지만, 결정이 느려질 수 있습니다.',
+   eff:{cr:-5, pp:4, cu:3}, later:[{in:2, eff:{cr:6, pp:2}, note:'삼사의 견제로 부정부패가 줄어 조정이 안정되었습니다.'}]},
+  {id:'vote', unit:'인권 보장과 헌법', modern:'국민 투표(직접 민주주의)', name:'백성 공론 투표',
+   desc:'중요한 정책을 백성에게 직접 묻고 결과를 따른다.', concept:'국민 투표는 국민의 뜻을 직접 반영하지만, 비용과 시간이 들고 전문적 판단이 어려울 수 있습니다.',
+   eff:{pp:7, cr:-3, tr:-2}},
+  {id:'wage', unit:'시장 경제와 금융', modern:'최저 임금 제도', name:'품삯 하한제',
+   desc:'나라 공사에 동원된 백성에게 일정 이상의 품삯을 준다.', concept:'최저 임금은 노동자의 생활을 보장하지만, 고용 부담을 늘릴 수 있습니다.',
+   eff:{pp:5, lv:3, tr:-5}},
+  {id:'antitrust', unit:'시장 경제와 금융', modern:'공정 거래법(독과점 규제)', name:'독점 상인 규제',
+   desc:'특권 상인의 시장 독점을 막고 누구나 장사할 수 있게 한다.', concept:'독과점을 규제하면 경쟁이 늘어 가격이 내려가고 소비자에게 이롭습니다.',
+   eff:{lv:6, pp:2, cr:-2}},
+  {id:'school', unit:'인권 보장과 헌법', modern:'의무 교육(교육권 보장)', name:'서당 무상 교육',
+   desc:'마을마다 서당을 세워 아이들을 무료로 가르친다.', concept:'교육받을 권리는 사회권이며, 교육 투자는 오랜 시간이 지나 성과가 나타납니다.',
+   eff:{cu:5, tr:-6, pp:2}, later:[{in:3, eff:{cu:5, lv:4}, note:'서당에서 배운 아이들이 자라 학문과 산업이 발전했습니다.'}]},
+  {id:'bond', unit:'시장 경제와 금융', modern:'국채 발행', name:'국채(國債) 발행',
+   desc:'부유한 상인에게 돈을 빌려 당장의 재정을 채운다.', concept:'국채로 당장 재정을 마련할 수 있지만, 나중에 이자와 원금을 갚아야 합니다.',
+   eff:{tr:12}, later:[{in:3, eff:{tr:-14}, note:'국채를 갚을 때가 되어 이자와 함께 국고가 빠져나갔습니다.'}]},
+  {id:'fta', unit:'세계화와 평화', modern:'자유 무역 협정(FTA)', name:'호시(互市) 교역 협정',
+   desc:'이웃 나라와 국경 시장을 열어 관세 없이 교역한다.', concept:'자유 무역은 교역을 늘려 이익을 주지만, 경쟁에 약한 산업은 타격을 받을 수 있습니다.',
+   eff:{lv:5, tr:4, df:-3, cr:-1}},
+  {id:'local', unit:'인권 보장과 헌법', modern:'지방 자치 제도', name:'향회(鄕會) 자치',
+   desc:'고을 일은 고을 사람들의 회의에서 정하게 한다.', concept:'지방 자치는 주민 참여와 지역 맞춤 정책을 가능하게 하지만, 중앙의 통제력은 약해집니다.',
+   eff:{pp:5, lv:3, cr:-4}},
+  {id:'press', unit:'인권 보장과 헌법', modern:'언론의 자유', name:'조보(朝報) 공개',
+   desc:'조정 소식지를 백성도 볼 수 있게 공개하고 비판을 허용한다.', concept:'언론의 자유는 정부를 감시하고 국민의 알 권리를 보장합니다.',
+   eff:{pp:4, cu:4, cr:-3}},
+  {id:'eco', unit:'자연환경과 인간', modern:'지속 가능한 발전(환경 보호)', name:'금산(禁山) 보호령',
+   desc:'산의 나무를 함부로 베지 못하게 해 숲을 지킨다.', concept:'환경 보호는 당장 개발을 제한하지만, 장기적으로 홍수·가뭄을 줄여 지속 가능한 발전을 돕습니다.',
+   eff:{lv:-3, tr:-1}, later:[{in:2, eff:{lv:7, pp:2}, note:'숲이 되살아나 홍수와 가뭄 피해가 줄었습니다.'}]},
+  {id:'insurance', unit:'정의와 사회 불평등', modern:'사회 보험', name:'계(契) 보험',
+   desc:'백성이 조금씩 곡식을 모아 두었다가 재해를 당한 집을 돕게 한다.', concept:'사회 보험은 가입자가 함께 부담해 질병·재해 같은 위험에 대비하는 제도입니다.',
+   eff:{lv:2, pp:3}, later:[{in:2, eff:{pp:3, lv:3}, note:'계 보험 덕분에 재해를 당한 백성이 빨리 일어섰습니다.'}]}
+];
+
 /* 조선 국정 시뮬레이션 — 게임 규칙 */
 const SKEYS = ['tr','pp','cr','df','lv','cu'];
 const BUDGET = 12;            // 한 턴에 쓰는 기본 예산(능력치 환산)
@@ -322,7 +372,7 @@ function addTo(d, e, k){ for(const s in e) d[s] = (d[s]||0) + e[s]*(k==null?1:k)
 
 function initGame(sc){
   return {sid:sc.id, t:0, st:Object.assign({}, sc.start), hist:[Object.assign({}, sc.start)],
-          pending:[], flags:{}, ach:[], crises:[], log:[], done:false, ending:null};
+          pending:[], flags:{}, ach:[], cards:[], crises:[], log:[], done:false, ending:null};
 }
 
 // 세금·예산 효과: gov = {tax:1~5, bud:{df,lv,cu}}
@@ -336,7 +386,7 @@ function govEffect(gov, st){
 
 function applyStats(st, d){ for(const k of SKEYS) st[k] = clamp(Math.round((st[k] + (d[k]||0))*10)/10, 0, 100); }
 
-function playTurn(g, sc, choiceId, gov, why){
+function playTurn(g, sc, choiceId, gov, why, cardId){
   const turn = sc.turns[g.t];
   const ch = turn.choices.find(c => c.id === choiceId) || {id:'-', label:'어명을 내리지 못함', eff:{cr:-4, pp:-3}};
   const before = Object.assign({}, g.st), notes = [], d = {};
@@ -344,6 +394,15 @@ function playTurn(g, sc, choiceId, gov, why){
   addTo(d, govEffect(gov, g.st));
   // 지연 효과 도착
   g.pending = g.pending.filter(p => { if(p.due === g.t){ addTo(d, p.eff); notes.push({type:'later', text:p.note}); return false; } return true; });
+  // 현대 제도 카드
+  let usedCard = null;
+  const card = cardId && typeof CARDS !== 'undefined' ? CARDS.find(c => c.id === cardId) : null;
+  g.cards = g.cards || [];
+  if(card && g.cards.indexOf(card.id) < 0 && g.cards.length < CARD_LIMIT){
+    addTo(d, card.eff);
+    if(card.later) card.later.forEach(l => g.pending.push({due:g.t + l.in, eff:l.eff, note:l.note, from:card.name}));
+    g.cards.push(card.id); usedCard = card.id;
+  }
   // 전쟁: 국방력에 따라 피해가 달라짐
   if(turn.war){
     if(g.st.df < 40){ addTo(d, {pp:-5, tr:-5, cr:-3}); notes.push({type:'war', text:'국방력이 약해 전쟁 피해가 컸습니다.'}); }
@@ -363,7 +422,7 @@ function playTurn(g, sc, choiceId, gov, why){
 
   const delta = {}; for(const k of SKEYS) delta[k] = Math.round((g.st[k] - before[k])*10)/10;
   g.log.push({t:g.t, year:turn.year, title:turn.title, choice:choiceId, label:ch.label, tax:gov.tax, bud:Object.assign({}, gov.bud),
-              why:why||'', delta:delta, notes:notes, ach:newAch, real:turn.real.pick === ch.id});
+              why:why||'', card:usedCard, delta:delta, notes:notes, ach:newAch, real:turn.real.pick === ch.id});
   g.t++;
   g.hist.push(Object.assign({}, g.st));
   if(g.t >= sc.turns.length) finishGame(g, sc);
@@ -398,8 +457,8 @@ if(typeof module !== 'undefined' && module.exports) module.exports = {SKEYS, ini
  */
 const ROOM_TTL = 21600; // 6시간
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const LOG_HEAD = ['기록 시각','방','학급','왕','사건 번호','연도','사건','모둠','모둠원','선택','실제와 일치','세금','예산(국방/민생/문화)','결정 근거','국고','민심','왕권','국방','민생','문화','점수'];
-const FINAL_HEAD = ['제출 시각','방','학급','왕','모둠','모둠원','점수','순위','실제 역사 일치','결말','국고','민심','왕권','국방','민생','문화','업적','위기','국정 방향','성찰1: 실제와 다른 선택','성찰2: 실제 왕 평가','성찰3: 우리 치세 실록'];
+const LOG_HEAD = ['기록 시각','방','학급','왕','사건 번호','연도','사건','모둠','모둠원','선택','실제와 일치','현대 제도 카드','세금','예산(국방/민생/문화)','결정 근거','국고','민심','왕권','국방','민생','문화','점수'];
+const FINAL_HEAD = ['제출 시각','방','학급','왕','모둠','모둠원','점수','순위','실제 역사 일치','결말','국고','민심','왕권','국방','민생','문화','업적','위기','사용한 카드','국정 방향','성찰1: 실제와 다른 선택','성찰2: 실제 왕 평가','성찰3: 우리 치세 실록'];
 
 function out(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
 function clean(v) { return (typeof v === 'string' && /^[=+\-@]/.test(v)) ? "'" + v : v; }
@@ -445,11 +504,11 @@ function putRoom(r, backup) {
 
 function publicRoom(r) {
   return {
-    code: r.code, sid: r.sid, cls: r.cls, phase: r.phase, turn: r.turn, total: TOTAL, ver: r.ver, openedAt: r.openedAt || null,
+    code: r.code, sid: r.sid, cls: r.cls, cardsOn: r.cards !== false, phase: r.phase, turn: r.turn, total: TOTAL, ver: r.ver, openedAt: r.openedAt || null,
     teams: r.order.map(id => {
       const t = r.teams[id], g = t.game;
       return { id: t.id, sid: t.sid || r.sid, name: t.name, members: t.members, goal: t.goal || '', submitted: !!t.sub,
-        st: g.st, hist: g.hist, ach: g.ach, crises: g.crises, log: g.log, done: g.done, ending: g.ending, lateNotes: g.lateNotes || [],
+        st: g.st, hist: g.hist, ach: g.ach, cards: g.cards || [], crises: g.crises, log: g.log, done: g.done, ending: g.ending, lateNotes: g.lateNotes || [],
         score: scoreOf(g), matches: realMatches(g), final: !!t.final };
     })
   };
@@ -482,7 +541,7 @@ function handle(d) {
   if (d.action === 'create') {
     if (d.sid && !scen(d.sid)) return { ok: false, error: '시나리오가 없습니다.' };
     let code; do { code = rid(4, CODE_CHARS); } while (CacheService.getScriptCache().get('room_' + code));
-    const r = { code: code, hostKey: rid(16, CODE_CHARS), sid: d.sid || '', cls: String(d.cls || ''), phase: 'lobby', turn: 0, teams: {}, order: [], created: Date.now() };
+    const r = { code: code, hostKey: rid(16, CODE_CHARS), sid: d.sid || '', cls: String(d.cls || ''), cards: d.cards !== false, phase: 'lobby', turn: 0, teams: {}, order: [], created: Date.now() };
     putRoom(r, true);
     return { ok: true, code: code, hostKey: r.hostKey };
   }
@@ -527,8 +586,16 @@ function handle(d) {
       if (Number(d.turn) !== r.turn) return { ok: false, error: '이미 지나간 사건입니다.' };
       const ch = s.turns[r.turn].choices.filter(c => c.id === d.choice)[0];
       if (!ch) return { ok: false, error: '대책을 고르세요.' };
+      let card = null;
+      if (d.card) {
+        const cd = CARDS.filter(x => x.id === d.card)[0], used = t.game.cards || [];
+        if (r.cards === false || !cd) return { ok: false, error: '쓸 수 없는 카드입니다.' };
+        if (used.indexOf(cd.id) >= 0) return { ok: false, error: '이미 쓴 카드입니다.' };
+        if (used.length >= CARD_LIMIT) return { ok: false, error: '카드는 ' + CARD_LIMIT + '장까지만 쓸 수 있습니다.' };
+        card = cd.id;
+      }
       const gov = d.gov || {}, b = gov.bud || {};
-      t.sub = { choice: ch.id, gov: { tax: Math.max(1, Math.min(5, Number(gov.tax) || 3)), bud: { df: Math.max(0, +b.df || 0), lv: Math.max(0, +b.lv || 0), cu: Math.max(0, +b.cu || 0) } }, why: String(d.why || '').slice(0, 1000), at: Date.now() };
+      t.sub = { choice: ch.id, gov: { tax: Math.max(1, Math.min(5, Number(gov.tax) || 3)), bud: { df: Math.max(0, +b.df || 0), lv: Math.max(0, +b.lv || 0), cu: Math.max(0, +b.cu || 0) } }, why: String(d.why || '').slice(0, 1000), card: card, at: Date.now() };
       putRoom(r, false);
       return { ok: true };
     }
@@ -538,7 +605,7 @@ function handle(d) {
       const ranked = r.order.map(id => r.teams[id]).sort((a, b) => scoreOf(b.game) - scoreOf(a.game));
       const g = t.game;
       sheetOf('제출', FINAL_HEAD).appendRow([new Date(), r.code, r.cls, s.king, t.name, t.members, scoreOf(g), ranked.indexOf(t) + 1, realMatches(g) + '/' + g.log.length,
-        g.ending ? g.ending.title : '', g.st.tr, g.st.pp, g.st.cr, g.st.df, g.st.lv, g.st.cu, g.ach.join(', '), g.crises.length, t.goal, t.final.ref1, t.final.ref2, t.final.ref3].map(clean));
+        g.ending ? g.ending.title : '', g.st.tr, g.st.pp, g.st.cr, g.st.df, g.st.lv, g.st.cu, g.ach.join(', '), g.crises.length, (g.cards || []).map(id => CARDS.filter(x => x.id === id)[0].name).join(', '), t.goal, t.final.ref1, t.final.ref2, t.final.ref3].map(clean));
       return { ok: true };
     }
   }
@@ -563,9 +630,9 @@ function handle(d) {
         const t = r.teams[id], g = t.game, s = tscen(r, t), turn = s.turns[r.turn];
         if (g.t !== r.turn) return;
         const sub = t.sub || { choice: null, gov: { tax: 3, bud: { df: 1, lv: 1, cu: 1 } }, why: '(제출하지 않음)' };
-        const l = playTurn(g, s, sub.choice, sub.gov, sub.why);
+        const l = playTurn(g, s, sub.choice, sub.gov, sub.why, sub.card);
         t.sub = null;
-        rows.push([new Date(), r.code, r.cls, s.king, r.turn + 1, turn.year, turn.title, t.name, t.members, l.label, l.real ? 'O' : 'X', sub.gov.tax,
+        rows.push([new Date(), r.code, r.cls, s.king, r.turn + 1, turn.year, turn.title, t.name, t.members, l.label, l.real ? 'O' : 'X', l.card ? CARDS.filter(x => x.id === l.card)[0].name : '', sub.gov.tax,
           sub.gov.bud.df + '/' + sub.gov.bud.lv + '/' + sub.gov.bud.cu, sub.why, g.st.tr, g.st.pp, g.st.cr, g.st.df, g.st.lv, g.st.cu, scoreOf(g)].map(clean));
       });
       r.phase = 'revealed';

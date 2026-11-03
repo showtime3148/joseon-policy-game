@@ -37,7 +37,9 @@ function runBots(room){
     const turn = teamScen(room, t).turns[room.turn];
     botTimers[key] = setTimeout(() => {
       const pick = Math.random() < 0.5 ? turn.real.pick : turn.choices[Math.floor(Math.random() * 3)].id;
-      API.post({ action: 'submit', code: room.code, teamId: id, turn: room.turn, choice: pick,
+      const free = (typeof CARDS !== 'undefined' && room.cardsOn && (t.cards || []).length < CARD_LIMIT) ? CARDS.filter(c => (t.cards || []).indexOf(c.id) < 0) : [];
+      const card = free.length && Math.random() < 0.45 ? free[Math.floor(Math.random() * free.length)].id : null;
+      API.post({ action: 'submit', code: room.code, teamId: id, turn: room.turn, choice: pick, card: card,
         gov: { tax: 2 + Math.floor(Math.random() * 3), bud: { df: 20 + Math.random() * 60, lv: 20 + Math.random() * 60, cu: 20 + Math.random() * 60 } }, why: BOT_WHY[i % 3] });
     }, 2500 + i * 1800 + Math.random() * 2500);
   });

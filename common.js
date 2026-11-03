@@ -36,7 +36,7 @@ function teamCard(room, t, o){
     ${badge}${kingdomSVG(t.st,{crisis:last&&last.notes.some(n=>n.type==='crisis')})}
     ${minibars(t.st)}
     ${o.members?`<div class="small muted">${esc(t.members)}</div>`:''}
-    ${t.ach.length?`<div class="small" style="color:var(--jade)">업적 ${t.ach.map(esc).join(' · ')}</div>`:''}</div>`;
+    ${t.ach.length?`<div class="small" style="color:var(--jade)">업적 ${t.ach.map(esc).join(' · ')}</div>`:''}${room.phase==='revealed'&&last&&last.t===room.turn&&last.card&&cardById(last.card)?`<div><span class="cchip">現代 ${esc(cardById(last.card).name)}</span></div>`:''}</div>`;
 }
 function leaderboardHTML(room, myId){
   const list=ranked(room), max=Math.max(1,...list.map(t=>t.score));
@@ -62,4 +62,13 @@ const TAX_TXT={1:'아주 가볍게',2:'가볍게',3:'예년처럼',4:'무겁게'
 
 function kingPicker(sel, name){
   return '<div class="kp" role="radiogroup">'+SCENARIOS.map(s=>`<label class="kpo"><input type="radio" name="${name||'king'}" value="${s.id}" ${sel===s.id?'checked':''}><span><b>${s.king}</b><em>${esc(s.title)}</em><small>재위 ${s.reign}</small></span></label>`).join('')+'</div>';
+}
+
+function cardById(id){ return typeof CARDS!=='undefined' ? CARDS.find(x=>x.id===id) : null; }
+function cardHTML(cd, o){
+  o=o||{};
+  return `<button type="button" class="pcard ${o.used?'used':''}" data-card="${cd.id}" aria-pressed="${!!o.sel}" ${o.dis?'disabled':''}>
+    <span class="mod"><span>現代 <b>${esc(cd.modern)}</b></span></span>
+    <span class="bd"><span class="jn">${esc(cd.name)}</span><span class="ds">${esc(cd.desc)}</span>
+    <span class="tags">${tagsOf(cd.eff)}${cd.later?'<span class="tag">몇 해 뒤 효과</span>':''}</span><span class="un">통합사회 · ${esc(cd.unit)}</span></span></button>`;
 }
