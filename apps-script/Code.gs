@@ -405,6 +405,8 @@ function out(o) { return ContentService.createTextOutput(JSON.stringify(o)).setM
 function clean(v) { return (typeof v === 'string' && /^[=+\-@]/.test(v)) ? "'" + v : v; }
 function rid(n, chars) { let s = ''; for (let i = 0; i < n; i++) s += chars.charAt(Math.floor(Math.random() * chars.length)); return s; }
 function scen(id) { return SCENARIOS.filter(s => s.id === id)[0]; }
+function tscen(r, t) { return scen(t.sid || r.sid); }
+const TOTAL = 7;
 function sheetOf(name, head) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sh = ss.getSheetByName(name);
@@ -442,12 +444,11 @@ function putRoom(r, backup) {
 }
 
 function publicRoom(r) {
-  const s = scen(r.sid);
   return {
-    code: r.code, sid: r.sid, cls: r.cls, phase: r.phase, turn: r.turn, total: s.turns.length, ver: r.ver, openedAt: r.openedAt || null,
+    code: r.code, sid: r.sid, cls: r.cls, phase: r.phase, turn: r.turn, total: TOTAL, ver: r.ver, openedAt: r.openedAt || null,
     teams: r.order.map(id => {
       const t = r.teams[id], g = t.game;
-      return { id: t.id, name: t.name, members: t.members, goal: t.goal || '', submitted: !!t.sub,
+      return { id: t.id, sid: t.sid || r.sid, name: t.name, members: t.members, goal: t.goal || '', submitted: !!t.sub,
         st: g.st, hist: g.hist, ach: g.ach, crises: g.crises, log: g.log, done: g.done, ending: g.ending, lateNotes: g.lateNotes || [],
         score: scoreOf(g), matches: realMatches(g), final: !!t.final };
     })
@@ -479,21 +480,23 @@ function doPost(e) {
 
 function handle(d) {
   if (d.action === 'create') {
-    if (!scen(d.sid)) return { ok: false, error: '시나리오가 없습니다.' };
+    if (d.sid && !scen(d.sid)) return { ok: false, error: '시나리오가 없습니다.' };
     let code; do { code = rid(4, CODE_CHARS); } while (CacheService.getScriptCache().get('room_' + code));
-    const r = { code: code, hostKey: rid(16, CODE_CHARS), sid: d.sid, cls: String(d.cls || ''), phase: 'lobby', turn: 0, teams: {}, order: [], created: Date.now() };
+    const r = { code: code, hostKey: rid(16, CODE_CHARS), sid: d.sid || '', cls: String(d.cls || ''), phase: 'lobby', turn: 0, teams: {}, order: [], created: Date.now() };
     putRoom(r, true);
     return { ok: true, code: code, hostKey: r.hostKey };
   }
   const code = String(d.code || '').toUpperCase();
   const r = getRoom(code);
   if (!r) return { ok: false, error: '방을 찾을 수 없습니다. 코드를 확인하세요.' };
-  const s = scen(r.sid);
 
   if (d.action === 'join') {
     const name = String(d.team || '').trim().slice(0, 20);
     if (!name) return { ok: false, error: '모둠 이름을 입력하세요.' };
     const exist = r.order.map(id => r.teams[id]).filter(t => t.name === name)[0];
+    const sid = r.sid || d.sid;
+    if (!exist && !scen(sid)) return { ok: false, error: '우리 모둠이 다스릴 왕을 고르세요.' };
+    const s = scen(sid);
     if (exist) { if (d.members) exist.members = String(d.members).slice(0, 100); putRoom(r, true); return { ok: true, teamId: exist.id, rejoin: true }; }
     if (r.order.length >= 12) return { ok: false, error: '한 방에는 12모둠까지 들어올 수 있습니다.' };
     if (r.phase === 'ended') return { ok: false, error: '이미 끝난 방입니다.' };
@@ -502,15 +505,22 @@ function handle(d) {
     // 늦게 들어온 모둠은 현재 사건부터 시작
     g.t = r.phase === 'revealed' ? r.turn + 1 : r.turn;
     for (let i = 0; i < g.t; i++) g.hist.push(Object.assign({}, g.st));
-    r.teams[id] = { id: id, name: name, members: String(d.members || '').slice(0, 100), game: g, sub: null, goal: '' };
+    r.teams[id] = { id: id, sid: sid, name: name, members: String(d.members || '').slice(0, 100), game: g, sub: null, goal: '' };
     r.order.push(id);
     putRoom(r, true);
     return { ok: true, teamId: id };
   }
 
-  if (d.action === 'goal' || d.action === 'submit' || d.action === 'final') {
+  if (d.action === 'goal' || d.action === 'submit' || d.action === 'final' || d.action === 'scenario') {
     const t = r.teams[d.teamId];
     if (!t) return { ok: false, error: '모둠 정보를 찾을 수 없습니다. 다시 참가하세요.' };
+    if (d.action === 'scenario') {
+      if (r.sid) return { ok: false, error: '이 방은 선생님이 시대를 정했습니다.' };
+      if (r.phase !== 'lobby') return { ok: false, error: '사건이 시작된 뒤에는 바꿀 수 없습니다.' };
+      if (!scen(d.sid)) return { ok: false, error: '시나리오가 없습니다.' };
+      t.sid = d.sid; t.game = initGame(scen(d.sid)); putRoom(r, true); return { ok: true };
+    }
+    const s = tscen(r, t);
     if (d.action === 'goal') { t.goal = String(d.goal || '').slice(0, 1000); putRoom(r, false); return { ok: true }; }
     if (d.action === 'submit') {
       if (r.phase !== 'deciding') return { ok: false, error: '지금은 어명을 받을 때가 아닙니다.' };
@@ -536,6 +546,7 @@ function handle(d) {
   if (d.action === 'host') {
     if (d.hostKey !== r.hostKey) return { ok: false, error: '교사 권한이 없습니다.' };
     if (d.cmd === 'open') {
+      const s = { turns: { length: TOTAL } };
       if (r.phase === 'lobby') { r.phase = 'deciding'; r.turn = 0; }
       else if (r.phase === 'revealed') {
         if (r.turn + 1 >= s.turns.length) r.phase = 'ended';
@@ -547,9 +558,9 @@ function handle(d) {
     }
     if (d.cmd === 'reveal') {
       if (r.phase !== 'deciding') return { ok: false, error: '공개할 사건이 없습니다.' };
-      const turn = s.turns[r.turn], rows = [];
+      const rows = [];
       r.order.forEach(id => {
-        const t = r.teams[id], g = t.game;
+        const t = r.teams[id], g = t.game, s = tscen(r, t), turn = s.turns[r.turn];
         if (g.t !== r.turn) return;
         const sub = t.sub || { choice: null, gov: { tax: 3, bud: { df: 1, lv: 1, cu: 1 } }, why: '(제출하지 않음)' };
         const l = playTurn(g, s, sub.choice, sub.gov, sub.why);

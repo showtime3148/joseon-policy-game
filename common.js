@@ -6,7 +6,11 @@ const API = {
 };
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function sg(x){ x=Math.round(x*10)/10; return x>0?'+'+x:x<0?'−'+Math.abs(x):'±0'; }
-function scenOf(room){ return SCENARIOS.find(s=>s.id===room.sid); }
+function scenById(id){ return SCENARIOS.find(s=>s.id===id); }
+function scenOf(room){ return scenById(room.sid); }
+function teamScen(room, t){ return scenById(t.sid||room.sid); }
+function groups(room){ const m={}; room.teams.forEach(t=>{ (m[t.sid]=m[t.sid]||[]).push(t); }); return SCENARIOS.filter(s=>m[s.id]).map(s=>({s:s, teams:m[s.id]})); }
+function mixed(room){ return !room.sid; }
 function ranked(room){ return room.teams.slice().sort((a,b)=>b.score-a.score); }
 function rankOf(room, id){ return ranked(room).findIndex(t=>t.id===id)+1; }
 function setConn(ok){ const c=document.getElementById('conn'); if(c){ c.className='conn'+(ok?'':' off'); c.lastChild.textContent=ok?' 실시간 연결':' 연결 끊김 · 재시도 중'; } }
@@ -26,9 +30,9 @@ function teamCard(room, t, o){
   const r=rankOf(room,t.id), last=t.log[t.log.length-1];
   let badge='';
   if(room.phase==='deciding') badge = t.submitted ? '<span class="stamp pop">裁可 제출</span>' : '<span class="waiting">논의 중…</span>';
-  if(room.phase==='revealed' && last && last.t===room.turn) badge = `<span class="pill ${last.real?'good':''}" style="position:absolute;top:44px;right:10px">${esc(last.label)}</span>`;
+  if(room.phase==='revealed' && last && last.t===room.turn) badge = `<span class="pill ${last.real?'good':''}" style="position:absolute;top:44px;right:10px;max-width:70%;overflow:hidden;text-overflow:ellipsis">${esc(last.label)}</span>`;
   return `<div class="tc ${o.me?'me':''}">${room.phase!=='lobby'?`<span class="rk r${r}">${r}</span>`:''}
-    <div class="nm"><b>${esc(t.name)}</b>${room.phase!=='lobby'?`<span class="sc num">${t.score}</span>`:''}</div>
+    <div class="nm"><b>${esc(t.name)}</b>${!room.sid?`<span class="pill navy" style="margin-right:auto">${esc(teamScen(room,t).king)}</span>`:''}${room.phase!=='lobby'?`<span class="sc num">${t.score}</span>`:''}</div>
     ${badge}${kingdomSVG(t.st,{crisis:last&&last.notes.some(n=>n.type==='crisis')})}
     ${minibars(t.st)}
     ${o.members?`<div class="small muted">${esc(t.members)}</div>`:''}
@@ -39,10 +43,10 @@ function leaderboardHTML(room, myId){
   return '<div class="lb">'+list.map((t,i)=>`<div class="lbr ${t.id===myId?'me':''}"><span class="num muted">${i+1}</span><b>${esc(t.name)}</b><span class="bb"><i style="width:${Math.max(2,t.score/max*100)}%"></i></span><span class="s num">${t.score}</span></div>`).join('')+'</div>';
 }
 /* 사건별 선택 분포 */
-function distHTML(room, turnIdx, myId){
-  const s=scenOf(room), turn=s.turns[turnIdx];
+function distHTML(room, turnIdx, myId, sid){
+  const s=scenById(sid||room.sid), turn=s.turns[turnIdx];
   const by={a:[],b:[],c:[],'-':[]};
-  room.teams.forEach(t=>{ const l=t.log.find(x=>x.t===turnIdx); if(l) by[l.choice||'-'] ? by[l.choice||'-'].push(t) : by['-'].push(t); });
+  room.teams.filter(t=>t.sid===s.id).forEach(t=>{ const l=t.log.find(x=>x.t===turnIdx); if(l) by[l.choice||'-'] ? by[l.choice||'-'].push(t) : by['-'].push(t); });
   const cols=turn.choices.map((c,i)=>{ const isReal=c.id===turn.real.pick;
     return `<div class="dc ${isReal?'real':''}"><div class="row between"><h4>${'甲乙丙'[i]} ${esc(c.label)}</h4><span class="cnt num">${by[c.id].length}</span></div>
       ${isReal?'<div class="small" style="color:var(--jade);font-weight:700;margin-bottom:4px">실제 역사의 선택</div>':''}
@@ -55,3 +59,7 @@ function tagsOf(eff){
     .map(([k,v])=>`<span class="tag ${v>0?'up':'dn'}">${STATS[k].name} ${v>0?'▲':'▼'}</span>`).join('');
 }
 const TAX_TXT={1:'아주 가볍게',2:'가볍게',3:'예년처럼',4:'무겁게',5:'아주 무겁게'};
+
+function kingPicker(sel, name){
+  return '<div class="kp" role="radiogroup">'+SCENARIOS.map(s=>`<label class="kpo"><input type="radio" name="${name||'king'}" value="${s.id}" ${sel===s.id?'checked':''}><span><b>${s.king}</b><em>${esc(s.title)}</em><small>재위 ${s.reign}</small></span></label>`).join('')+'</div>';
+}

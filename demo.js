@@ -23,17 +23,18 @@ function botsKey(code){ return 'jd_bots_' + code; }
 function getBots(code){ try { return JSON.parse(localStorage.getItem(botsKey(code))) || []; } catch (e) { return []; } }
 function addBots(code){
   const ids = getBots(code);
-  return BOT_NAMES.reduce((p, n, i) => p.then(() => API.post({ action: 'join', code: code, team: n, members: '가상 모둠 ' + (i + 1) })
+  const kings = ['sejong', 'jeongjo', 'gwanghae'];
+  return BOT_NAMES.reduce((p, n, i) => p.then(() => API.post({ action: 'join', code: code, team: n, members: '가상 모둠 ' + (i + 1), sid: kings[i] })
     .then(j => { if (j.ok && ids.indexOf(j.teamId) < 0) ids.push(j.teamId); })), Promise.resolve())
     .then(() => { try { localStorage.setItem(botsKey(code), JSON.stringify(ids)); } catch (e) {} });
 }
 const botTimers = {};
 function runBots(room){
   if (!DEMO || !room || room.phase !== 'deciding') return;
-  const s = scenOf(room), turn = s.turns[room.turn];
   getBots(room.code).forEach((id, i) => {
     const t = room.teams.find(x => x.id === id), key = id + ':' + room.turn;
     if (!t || t.submitted || botTimers[key]) return;
+    const turn = teamScen(room, t).turns[room.turn];
     botTimers[key] = setTimeout(() => {
       const pick = Math.random() < 0.5 ? turn.real.pick : turn.choices[Math.floor(Math.random() * 3)].id;
       API.post({ action: 'submit', code: room.code, teamId: id, turn: room.turn, choice: pick,

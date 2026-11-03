@@ -33,6 +33,7 @@ let L=load(), room=null, ver=0, shown='', editing=false, timer=null;
 function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(L)); }catch(e){} }
 function me(){ return room && room.teams.find(t=>t.id===L.teamId); }
+function myScen(){ return teamScen(room, me()); }
 function v(id){ const e=document.getElementById(id); return e?e.value:''; }
 function fail(m){ const e=document.getElementById('err'); if(e){ e.textContent=m; e.scrollIntoView({block:'center'}); } }
 
@@ -49,10 +50,10 @@ function poll(){
     render();
   }).catch(()=>setConn(false)).finally(()=>{ timer=setTimeout(poll, 2500); });
 }
-function key(){ const m=me(); return [room.phase, room.turn, m.submitted?1:0, m.final?1:0, editing?1:0].join(':'); }
+function key(){ const m=me(); return [m.sid, room.phase, room.turn, m.submitted?1:0, m.final?1:0, editing?1:0].join(':'); }
 function render(){
   if(!room){ shown=''; return vJoin(); }
-  const s=scenOf(room), m=me();
+  const s=myScen(), m=me();
   document.getElementById('who').textContent = m.name+' 모둠 · '+s.king+' 시대 · 방 '+room.code;
   const k=key();
   if(k===shown){ liveUpdate(); return; }
@@ -75,10 +76,11 @@ function vJoin(){
   $app.innerHTML=`<div class="stack">
     <div class="banner">${bannerSVG(220)}<div class="over"><h1>朝鮮 國政 會議</h1><p>모둠이 한 나라를 맡아 조선의 위기를 해결합니다</p></div></div>
     ${DEMO?'<div class="note" style="max-width:560px;margin:0 auto;width:100%"><b>체험 모드</b> · 먼저 <a href="host.html" target="_blank" rel="noopener">교사 화면</a>을 새 탭에서 열어 방을 만든 뒤, 그 방 코드로 들어오세요. 같은 브라우저 안에서만 동작합니다.</div>':''}
-    <form class="card stack" id="join" style="max-width:560px; margin:0 auto; width:100%" novalidate>
+    <form class="card stack" id="join" style="max-width:900px; margin:0 auto; width:100%" novalidate>
       <h2 style="font-size:22px">어전 회의에 참가하기</h2>
       <label class="f" for="code">방 코드 <span class="hint">교실 화면에 보이는 네 글자</span><input type="text" id="code" value="${esc(L.code||q)}" maxlength="4" autocomplete="off" style="font-size:28px; letter-spacing:.3em; text-transform:uppercase; font-family:var(--display); font-weight:800"></label>
       <label class="f" for="team">모둠 이름<input type="text" id="team" value="${esc(L.teamName||'')}" maxlength="20" placeholder="예: 집현전" autocomplete="off"></label>
+      <div class="f"><b style="font-weight:500">우리 모둠이 다스릴 왕 <span class="hint">선생님이 시대를 정한 방이면 고르지 않아도 됩니다</span></b>${kingPicker(L.sid,'king')}</div>
       <label class="f" for="members">모둠원 <span class="hint">번호와 이름, 쉼표로 구분</span><input type="text" id="members" value="${esc(L.members||'')}" placeholder="예: 3 김민준, 7 이서연, 12 박지호" autocomplete="off"></label>
       <div class="err" id="err"></div>
       <button class="btn primary big" type="submit">입궐하기</button>
@@ -88,13 +90,14 @@ function vJoin(){
 
 /* ---------- 대기실 ---------- */
 function vLobby(){
-  const s=scenOf(room), m=me();
+  const s=myScen(), m=me();
   $app.innerHTML=`<div class="stack">
     <div class="banner">${bannerSVG(170)}<div class="over"><div class="eyebrow" style="color:#f3d9a0">재위 ${s.reign}</div><h1>${s.king} · ${esc(s.title)}</h1></div></div>
     <div class="play"><div class="stack">
       <div class="card stack"><div class="row between"><h2 style="font-size:20px">즉위 당시 나라의 형편</h2><span class="pill navy">선생님이 첫 사건을 열 때까지 기다리세요</span></div>
         <p style="margin:0; font-size:16px; line-height:1.8">${esc(s.lead)}</p>
         <div class="mykd">${kingdomSVG(m.st)}</div></div>
+      ${!room.sid?`<div class="card stack"><h3 style="font-size:18px">다스릴 왕 바꾸기</h3><p class="small muted" style="margin:0">첫 사건이 열리기 전까지 바꿀 수 있습니다.</p>${kingPicker(m.sid,'king2')}<div class="small" id="ks"></div></div>`:''}
       <div class="card stack"><h3 style="font-size:18px">우리 모둠의 국정 방향</h3>
         <label class="f" for="goal">가장 시급한 문제는 무엇이며, 어떤 지표를 먼저 살릴 것인가요?<textarea id="goal">${esc(L.goalDraft!=null?L.goalDraft:m.goal)}</textarea></label>
         <div class="row"><button class="btn jade" data-act="goal">국정 방향 저장</button><span class="small" id="gs">${m.goal?'저장됨':''}</span></div></div>
@@ -113,7 +116,7 @@ function draft(){
   return L.draft;
 }
 function vDecide(){
-  const s=scenOf(room), m=me(), turn=s.turns[room.turn], d=draft();
+  const s=myScen(), m=me(), turn=s.turns[room.turn], d=draft();
   const head=`<div class="row between" style="margin-bottom:12px"><div class="steps">${s.turns.map((_,i)=>`<i class="${i<room.turn?'d':i===room.turn?'n':''}"></i>`).join('')}</div><span id="subst">${subStatus()}</span></div>
     <div class="card event">${eventArt(turn.art)}<div><div class="yr">${turn.year}년 · 사건 ${room.turn+1}/${s.turns.length}</div><h2>${esc(turn.title)}</h2><p>${esc(turn.text)}</p>${turn.war?'<p style="margin-top:8px"><span class="pill bad">전쟁 · 쌓아 둔 국방력이 피해를 좌우합니다</span></p>':''}</div></div>`;
   if(m.submitted && !editing){
@@ -157,7 +160,7 @@ function updGov(){
 
 /* ---------- 결과 공개 ---------- */
 function vReveal(){
-  const s=scenOf(room), m=me(), turn=s.turns[room.turn], l=m.log.find(x=>x.t===room.turn);
+  const s=myScen(), m=me(), turn=s.turns[room.turn], l=m.log.find(x=>x.t===room.turn);
   const r=rankOf(room,m.id);
   $app.innerHTML=`<div class="stack">
     <div class="card stack"><div class="row between"><div class="eyebrow">${turn.year}년 실록</div><span class="pill navy">현재 ${r}위 · ${m.score}점</span></div>
@@ -166,7 +169,7 @@ function vReveal(){
       ${l.notes.map(n=>`<div class="note ${n.type}">${n.type==='later'?'뒤늦게 나타난 효과: ':''}${esc(n.text)}</div>`).join('')}
       ${l.ach?`<div><span class="ach pop">業 업적 달성 · ${esc(l.ach)}</span></div>`:''}`:'<p class="muted">이번 사건에는 참여하지 않았습니다.</p>'}
     </div>
-    <div class="card stack"><h3 style="font-size:18px">모둠들의 선택과 실제 역사</h3>${distHTML(room, room.turn, m.id)}
+    <div class="card stack"><h3 style="font-size:18px">${room.sid?'모둠들의 선택과 실제 역사':esc(s.king)+' 시대를 고른 모둠들의 선택과 실제 역사'}</h3>${distHTML(room, room.turn, m.id, m.sid)}
       <div class="real"><b>실제 역사에서는</b> ${esc(turn.real.text)}</div></div>
     <div class="play"><div class="card"><h3 style="font-size:17px; margin-bottom:10px">각 나라의 모습</h3><div id="live">${othersHTML()}</div></div>
       <div class="side"><div class="card"><h3 style="font-size:16px; margin-bottom:10px">순위</h3><div id="lb">${leaderboardHTML(room,m.id)}</div></div>
@@ -175,7 +178,7 @@ function vReveal(){
 
 /* ---------- 최종 ---------- */
 function reportText(){
-  const s=scenOf(room), m=me(), Lr=[];
+  const s=myScen(), m=me(), Lr=[];
   Lr.push('[조선 국정 회의 보고서]'); Lr.push('방: '+room.code+' / 모둠: '+m.name+' / 모둠원: '+m.members);
   Lr.push('시대: '+s.king+' ('+s.reign+') '+s.title); Lr.push('점수: '+m.score+'점 ('+rankOf(room,m.id)+'위/'+room.teams.length+'모둠) / 실제 역사와 일치: '+m.matches+'/'+m.log.length);
   Lr.push('최종 지표: '+SKEYS.map(k=>STATS[k].name+' '+Math.round(m.st[k])).join(', '));
@@ -188,7 +191,7 @@ function reportText(){
   return Lr.join('\n');
 }
 function vEnd(){
-  const s=scenOf(room), m=me(), r=rankOf(room,m.id); L.ref=L.ref||{a:'',b:'',c:''};
+  const s=myScen(), m=me(), r=rankOf(room,m.id); L.ref=L.ref||{a:'',b:'',c:''};
   const cmp=m.log.map(l=>{ const t=s.turns[l.t], rc=t.choices.find(c=>c.id===t.real.pick); return `<tr><td class="num">${l.year}</td><td>${esc(t.title)}</td><td><b>${esc(l.label)}</b></td><td>${esc(rc.label)}</td><td>${l.real?'<span class="pill good">같음</span>':'<span class="pill">다름</span>'}</td></tr>`; }).join('');
   $app.innerHTML=`<div class="stack">
     <div class="banner">${bannerSVG(150)}<div class="over"><div class="eyebrow" style="color:#f3d9a0">${s.king} 치세 종료</div><h1>${esc(m.name)} 모둠 · ${r}위 · ${m.score}점</h1></div></div>
@@ -216,13 +219,13 @@ document.addEventListener('submit', e=>{
   e.preventDefault();
   const f=e.target, btn=f.querySelector('button[type=submit]');
   if(f.id==='join'){
-    const code=v('code').trim().toUpperCase(), team=v('team').trim(), members=v('members').trim();
+    const code=v('code').trim().toUpperCase(), team=v('team').trim(), members=v('members').trim(), kc=document.querySelector('input[name=king]:checked'), sid=kc?kc.value:'';
     if(code.length!==4) return fail('방 코드 네 글자를 입력하세요.');
     if(!team) return fail('모둠 이름을 입력하세요.'); if(!members) return fail('모둠원을 입력하세요.');
     btn.disabled=true;
-    API.post({action:'join', code, team, members}).then(j=>{
+    API.post({action:'join', code, team, members, sid}).then(j=>{
       if(!j.ok){ btn.disabled=false; return fail(j.error); }
-      L={code, teamId:j.teamId, teamName:team, members}; save(); ver=0; poll();
+      L={code, teamId:j.teamId, teamName:team, members, sid}; save(); ver=0; poll();
     }).catch(()=>{ btn.disabled=false; fail('서버에 연결하지 못했습니다. 인터넷 연결을 확인하세요.'); });
   }
   if(f.id==='act'){
@@ -251,6 +254,10 @@ document.addEventListener('click', e=>{
   if(a==='goal'){ const g=v('goal'); t.disabled=true; API.post({action:'goal', code:L.code, teamId:L.teamId, goal:g}).then(j=>{ t.disabled=false; document.getElementById('gs').textContent=j.ok?'저장됨':'저장 실패'; }).catch(()=>{ t.disabled=false; document.getElementById('gs').textContent='저장 실패'; }); return; }
   if(a==='copy'){ const m=document.getElementById('copied'), fb=()=>{ const b=document.getElementById('copybox'); b.hidden=false; b.select(); m.textContent='상자 내용을 직접 복사하세요.'; };
     try{ navigator.clipboard.writeText(reportText()).then(()=>{ m.textContent='복사했습니다.'; }, fb); }catch(_){ fb(); } }
+});
+document.addEventListener('change', e=>{
+  if(e.target.name==='king2'){ const ks=document.getElementById('ks'); ks.textContent='바꾸는 중…';
+    API.post({action:'scenario', code:L.code, teamId:L.teamId, sid:e.target.value}).then(j=>{ if(!j.ok){ ks.textContent=j.error; return; } L.sid=e.target.value; save(); shown=''; ver=0; poll(); }).catch(()=>{ ks.textContent='바꾸지 못했습니다.'; }); }
 });
 document.addEventListener('input', e=>{
   const id=e.target.id;
