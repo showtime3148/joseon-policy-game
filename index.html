@@ -160,14 +160,18 @@ function deckHTML(m,d){
   const used=m.cards||[], left=CARD_LIMIT-used.length;
   return `<div class="card stack" style="margin-bottom:14px"><div class="row between"><div><h3 style="font-size:18px">현대 제도 카드 <span class="small muted" style="font-family:var(--body)">선택 사항 · 사건마다 1장</span></h3>
     <p class="small muted" style="margin:2px 0 0">오늘날의 경제·정치·법 제도를 조선에 맞게 바꾼 정책입니다. 사건의 대책과 함께 시행됩니다.</p></div><span class="pill ${left?'navy':'bad'}">남은 카드 ${left}/${CARD_LIMIT}</span></div>
-    <div class="deck">${CARDS.map(cd=>cardHTML(cd,{sel:d.card===cd.id, used:used.includes(cd.id), dis:used.includes(cd.id)||(!left)})).join('')}</div></div>`;
+    <div id="cardsel">${cardSelHTML()}</div>
+    <div class="deck">${CARDS.map(cd=>cardHTML(cd,{sel:d.card===cd.id, used:used.includes(cd.id), dim:used.includes(cd.id)||(!left)})).join('')}</div></div>`;
+}
+function cardSelHTML(){ const cd=L.draft&&L.draft.card&&cardById(L.draft.card);
+  return cd?`<div class="cardnote">이번 사건에 쓸 카드: <b>${esc(cd.name)}</b> <span class="small muted">(${esc(cd.modern)})</span></div>`:'<p class="hint" style="margin:0">카드를 누르면 자세한 설명이 나오고, 그 안에서 쓸지 고를 수 있습니다.</p>';
 }
 function advisorsHTML(m){
   const A=m.advisors||{have:[],used:[]}, used=A.used||[], heard=!!room.myAdvice;
   return `<div class="card stack"><div class="row between"><h3 style="font-size:16px">히든 조언자</h3><span class="small muted">${A.have.length}/${ADVISORS.length}명</span></div>
-    <p class="hint" style="margin:0">조언자는 자기 분야의 숨은 효과를 알려 줍니다. 한 사건에 한 명, 조언자마다 한 번만 부를 수 있습니다.</p>
+    <p class="hint" style="margin:0">초상화를 누르면 조언자 설명이 나옵니다. 한 사건에 한 명, 조언자마다 한 번만 부를 수 있습니다.</p>
     <div class="advs">${ADVISORS.map(a=>{ const have=A.have.includes(a.id), u=used.includes(a.id), ready=have&&!u&&!heard;
-      return `<button type="button" class="adv ${u?'used':''} ${ready?'ready':''}" ${ready?`data-adv="${a.id}"`:'disabled'} title="${have?esc(a.name+' · '+a.title):esc(a.hint)}">${advisorSVG(a,!have)}<b>${have?esc(a.name):'???'}</b><span class="muted">${have?(u?'조언 마침':ready?'조언 청하기':'다음 사건에'):'잠김'}</span></button>`; }).join('')}</div>
+      return `<button type="button" class="adv ${u?'used':''} ${ready?'ready':''}" data-adv="${a.id}" title="${have?esc(a.name+' · '+a.title):esc(a.hint)}">${advisorSVG(a,!have)}<b>${have?esc(a.name):'???'}</b><span class="muted">${have?(u?'조언 마침':ready?'조언 청하기':'다음 사건에'):'잠김'}</span></button>`; }).join('')}</div>
     <div class="small muted" id="advhint"></div></div>`;
 }
 function speechHTML(ad){
@@ -275,14 +279,23 @@ document.addEventListener('submit', e=>{
   }
 });
 document.addEventListener('click', e=>{
-  const t=e.target.closest('[data-pick],[data-act],[data-card],[data-adv]'); if(!t||t.disabled) return;
-  if(t.dataset.adv){ const a=advisorById(t.dataset.adv), h=document.getElementById('advhint');
-    if(t.dataset.confirm!=='1'){ document.querySelectorAll('[data-adv]').forEach(b=>{ b.dataset.confirm=''; }); t.dataset.confirm='1'; h.innerHTML='<b>'+esc(a.name)+'</b>에게 조언을 청할까요? 이번 게임에서 한 번뿐입니다. 한 번 더 누르면 부릅니다.'; return; }
-    t.disabled=true; h.textContent=josa(a.name,'을를')+' 부르는 중…';
-    API.post({action:'advise', code:L.code, teamId:L.teamId, advisor:a.id}).then(j=>{ if(!j.ok){ h.textContent=j.error; t.disabled=false; return; } room.myAdvice=j.advice; ver=0; shown=''; render(); poll(); })
-      .catch(()=>{ h.textContent='부르지 못했습니다. 다시 눌러 주세요.'; t.disabled=false; });
+  const t=e.target.closest('[data-pick],[data-act],[data-card],[data-adv],[data-usecard],[data-advcall]'); if(!t||t.disabled) return;
+  if(t.dataset.adv){ const a=advisorById(t.dataset.adv), m=me(), A=m.advisors||{have:[],used:[]}, have=A.have.includes(a.id), used=A.used.includes(a.id);
+    const ready = have && !used && !room.myAdvice && room.phase==='deciding' && !m.submitted;
+    const foot = ready ? '<button class="btn" data-close>닫기</button><button class="btn primary" data-advcall="'+a.id+'">'+esc(a.name)+'에게 조언 청하기</button>'
+      : '<span class="small muted" style="margin-right:auto">'+(have&&!used&&room.myAdvice?'이번 사건에는 이미 조언을 들었습니다.':'')+'</span><button class="btn" data-close>닫기</button>';
+    openModal(advisorModalHTML(a, have, used, foot)); return; }
+  if(t.dataset.advcall){ const a=advisorById(t.dataset.advcall); t.disabled=true; t.textContent=josa(a.name,'을를')+' 부르는 중…';
+    API.post({action:'advise', code:L.code, teamId:L.teamId, advisor:a.id}).then(j=>{ closeModal(); if(!j.ok){ const h=document.getElementById('advhint'); if(h) h.textContent=j.error; return; } room.myAdvice=j.advice; ver=0; shown=''; render(); poll(); })
+      .catch(()=>{ t.disabled=false; t.textContent='다시 시도'; });
     return; }
-  if(t.dataset.card){ L.draft.card = L.draft.card===t.dataset.card ? null : t.dataset.card; save(); document.querySelectorAll('.pcard').forEach(b=>b.setAttribute('aria-pressed', b.dataset.card===L.draft.card)); return; }
+  if(t.dataset.card){ const cd=cardById(t.dataset.card), m=me(), used=(m.cards||[]), d=L.draft;
+    const canUse = room.phase==='deciding' && !m.submitted && !used.includes(cd.id) && used.length<CARD_LIMIT;
+    const foot = d && d.card===cd.id ? '<button class="btn" data-usecard="">선택 취소</button><button class="btn primary" data-close>닫기</button>'
+      : canUse ? '<button class="btn" data-close>닫기</button><button class="btn primary" data-usecard="'+cd.id+'">이 카드 쓰기</button>'
+      : '<span class="small muted" style="margin-right:auto">'+(used.includes(cd.id)?'이미 쓴 카드입니다.':used.length>=CARD_LIMIT?'카드를 모두 썼습니다.':'')+'</span><button class="btn" data-close>닫기</button>';
+    openModal(cardModalHTML(cd, foot)); return; }
+  if(t.dataset.usecard!=null){ L.draft.card=t.dataset.usecard||null; save(); closeModal(); document.querySelectorAll('.pcard').forEach(b=>b.setAttribute('aria-pressed', b.dataset.card===L.draft.card)); const s=document.getElementById('cardsel'); if(s) s.innerHTML=cardSelHTML(); return; }
   if(t.dataset.pick){ L.draft.pick=t.dataset.pick; save(); document.querySelectorAll('.ch').forEach(b=>b.setAttribute('aria-pressed', b.dataset.pick===L.draft.pick)); return; }
   const a=t.dataset.act;
   if(a==='edit'){ editing=true; const sub=room.mySub; if(sub){ draft(); Object.assign(L.draft,{pick:sub.choice, card:sub.card||null, tax:sub.gov.tax, bud:Object.assign({},sub.gov.bud), why:sub.why}); save(); } render(); return; }

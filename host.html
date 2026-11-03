@@ -190,6 +190,7 @@ function vEnd(){
 
 /* ---------- 이벤트 ---------- */
 document.addEventListener('click', e=>{
+  const cdb=e.target.closest('[data-card]'); if(cdb){ openModal(cardModalHTML(cardById(cdb.dataset.card))); return; }
   const t=e.target.closest('[data-sid],[data-act],[data-cmd]'); if(!t||t.disabled) return;
   if(t.dataset.sid){ pick=t.dataset.sid; document.querySelectorAll('.king').forEach(b=>b.setAttribute('aria-pressed', b.dataset.sid===pick)); return; }
   if(t.dataset.cmd) return cmd(t.dataset.cmd, t);

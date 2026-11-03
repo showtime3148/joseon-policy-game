@@ -67,8 +67,46 @@ function kingPicker(sel, name){
 function cardById(id){ return typeof CARDS!=='undefined' ? CARDS.find(x=>x.id===id) : null; }
 function cardHTML(cd, o){
   o=o||{};
-  return `<button type="button" class="pcard ${o.used?'used':''}" data-card="${cd.id}" aria-pressed="${!!o.sel}" ${o.dis?'disabled':''}>
+  return `<button type="button" class="pcard ${o.used?'used':''} ${o.dim?'dim':''}" data-card="${cd.id}" aria-pressed="${!!o.sel}" aria-haspopup="dialog">
     <span class="mod"><span>現代 <b>${esc(cd.modern)}</b></span></span>
     <span class="bd"><span class="jn">${esc(cd.name)}</span><span class="ds">${esc(cd.desc)}</span>
     <span class="tags">${tagsOf(cd.eff)}${cd.later?'<span class="tag">몇 해 뒤 효과</span>':''}</span><span class="un">통합사회 · ${esc(cd.unit)}</span></span></button>`;
+}
+
+/* 팝업 */
+let modalReturn=null;
+function openModal(html){
+  closeModal(); modalReturn=document.activeElement;
+  const bg=document.createElement('div'); bg.className='modal-bg'; bg.id='modal';
+  bg.innerHTML=`<div class="modal" role="dialog" aria-modal="true">${html}</div>`;
+  bg.addEventListener('click', e=>{ if(e.target===bg || e.target.closest('[data-close]')) closeModal(); });
+  document.body.appendChild(bg);
+  const f=bg.querySelector('.mf button, .x'); if(f) f.focus();
+}
+function closeModal(){ const m=document.getElementById('modal'); if(m){ m.remove(); if(modalReturn&&modalReturn.focus) try{ modalReturn.focus(); }catch(e){} } }
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+function effList(eff){ return Object.entries(eff).filter(([k,v])=>v).map(([k,v])=>`<span class="tag ${v>0?'up':'dn'}">${STATS[k].name} ${v>0?'▲':'▼'}</span>`).join(''); }
+function cardModalHTML(cd, foot){
+  return `<div class="mh"><div><small>현대 제도 카드 · 통합사회 ${esc(cd.unit)}</small><h2>${esc(cd.name)}</h2></div><button class="x" data-close aria-label="닫기">✕</button></div>
+  <div class="mbody">
+    <div class="bridge"><div><span>現代 오늘날</span><b>${esc(cd.modern)}</b></div><div style="border:none;background:none;font-size:22px">→</div><div style="border-color:var(--jade)"><span>朝鮮 조선판</span><b style="color:var(--jade)">${esc(cd.name)}</b></div></div>
+    <div class="sec2"><h4>어떤 정책인가요</h4><p>${esc(cd.desc)}</p></div>
+    <div class="sec2"><h4>오늘날의 ${esc(cd.modern)}</h4><p>${esc(cd.detail||cd.concept)}</p></div>
+    <div class="sec2"><h4>조선에 맞게 바꾼 점</h4><p>${esc(cd.adapt||'')}</p></div>
+    <div class="sec2"><h4>예상되는 효과</h4><div class="tags">${effList(cd.eff)}${cd.later?'<span class="tag">몇 해 뒤 추가 효과 있음</span>':''}</div><p class="hint" style="margin-top:4px">효과의 방향만 공개됩니다. 크기는 히든 조언자도 알려 주지 않습니다.</p></div>
+    <div class="sec2"><h4>핵심 개념</h4><p>${esc(cd.concept)}</p></div>
+    <div class="think"><b>생각해 볼 질문</b> ${esc(cd.think||'')}</div>
+  </div>
+  <div class="mf">${foot||'<button class="btn" data-close>닫기</button>'}</div>`;
+}
+function advisorModalHTML(a, have, used, foot){
+  const st=a.stats.map(k=>STATS[k].name).join(' · ');
+  return `<div class="mh"><div><small>히든 조언자</small><h2>${have?esc(a.name):'??? (잠김)'}</h2></div><button class="x" data-close aria-label="닫기">✕</button></div>
+  <div class="mbody"><div class="advtop">${advisorSVG(a,!have)}<div>
+      ${have?`<p style="margin:0 0 6px; font-weight:700">${esc(a.title)}</p><p style="margin:0; font-family:var(--display); font-size:16.5px; line-height:1.7">“${esc(a.hello)}”</p>`:'<p style="margin:0">아직 만나지 못한 조언자입니다.</p>'}</div></div>
+    <div class="sec2"><h4>꿰뚫어 보는 분야</h4><p>${have?st+' — 이 분야에 대해 세 대책의 정확한 효과 크기와 몇 해 뒤 효과까지 알려 줍니다.':'?'}</p></div>
+    <div class="sec2"><h4>해금 조건</h4><p>${esc(a.hint)}</p></div>
+    <div class="sec2"><h4>쓸 수 있는 횟수</h4><p>${!have?'잠겨 있습니다.':used?'이번 게임에서 이미 조언을 들었습니다.':'이번 게임에서 한 번 조언을 청할 수 있습니다. 한 사건에는 한 명만 부를 수 있습니다.'}</p></div></div>
+  <div class="mf">${foot||'<button class="btn" data-close>닫기</button>'}</div>`;
 }
