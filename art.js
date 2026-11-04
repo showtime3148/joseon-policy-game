@@ -16,7 +16,7 @@ function bannerSVG(h){
   peaks.forEach(([x1,top,x2])=>{ const mx=(x1+x2)/2-20, y=h*top/220;
     s+=`<path d="M${x1-60} ${h} Q${mx-40} ${y+40} ${mx+20} ${y} Q${mx+80} ${y+40} ${x2+40} ${h} Z" fill="url(#bpk)" stroke="#d8e8d6" stroke-width="3"/>`;
     for(let k=1;k<4;k++) s+=`<path d="M${mx+20-k*28} ${y+k*26} Q${mx+20} ${y+k*18} ${mx+20+k*28} ${y+k*26}" fill="none" stroke="#d8e8d6" stroke-width="1.6" opacity=".7"/>`; });
-  s+=`<path d="M590 ${h*0.42} q10 ${h*0.2} 0 ${h*0.4}" stroke="#e9f2ee" stroke-width="6" fill="none" opacity=".8"/>`;
+  s+=`<path d="M1035 ${h*0.5} q10 ${h*0.16} 0 ${h*0.32}" stroke="#e9f2ee" stroke-width="6" fill="none" opacity=".8"/>`;
   for(let i=0;i<14;i++){ const x=i*92-20; s+=`<path d="M${x} ${h-12} q23 -22 46 0 q23 -22 46 0" fill="none" stroke="#e9f2ee" stroke-width="3" opacity=".75"/>`; }
   [[95,0.55],[1105,0.55]].forEach(([x,f])=>{ const y=h*f;
     s+=`<path d="M${x} ${h} L${x+4} ${y}" stroke="#8e2f22" stroke-width="9"/>`;

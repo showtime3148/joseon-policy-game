@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="style.css">
 <style>
 .play{display:grid; grid-template-columns:1fr 340px; gap:16px; align-items:start}
@@ -205,7 +206,7 @@ function vReveal(){
   const tDist=at+1200, tReal=tDist+1500, tRank=tReal+1400;
   $app.innerHTML=`<div class="stack" id="rv"><button class="skip" data-act="skip">건너뛰기 ▶▶</button>
     <div class="card stack"><div class="row between"><div class="eyebrow">${turn.year}년 실록</div><span class="pill navy" data-at="${tRank+600}">현재 ${r}위 · ${m.score}점</span></div>
-      ${l?`<div class="rec" data-at="0" data-fx="type">${turn.year}년, ${s.king}께서 「${esc(turn.title)}」에 대하여 <b>${esc(l.label)}</b>을(를) 명하시고${cd?`, 아울러 「${esc(cd.name)}」을(를) 시행하시고`:''}, 세금은 ${TAX_TXT[l.tax]} 걷게 하셨다.</div>
+      ${l?`<div class="rec" data-at="0" data-fx="type">${!turn.choices.some(c=>c.id===l.choice)?`${turn.year}년, 「${esc(turn.title)}」에 대하여 조정은 끝내 <b>어명을 내리지 못하였다</b>. 세금은 ${TAX_TXT[l.tax]} 걷었다.`:`${turn.year}년, ${s.king}께서 「${esc(turn.title)}」에 대하여 <b>${esc(l.label)}</b>을(를) 명하시고${cd?`, 아울러 「${esc(cd.name)}」을(를) 시행하시고`:''}, 세금은 ${TAX_TXT[l.tax]} 걷게 하셨다.`}</div>
       <div class="deltas">${SKEYS.map((k,i)=>`<div class="dl" data-at="${1700+i*160}" data-fx="count" data-to="${l.delta[k]}"><div class="k">${STATS[k].name}</div><div class="n z">±0</div><div class="small muted num">${Math.round(m.st[k])}</div></div>`).join('')}</div>
       ${notes}${extras}`:'<p class="muted">이번 사건에는 참여하지 않았습니다.</p>'}
     </div>
