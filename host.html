@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>조선 국정 회의 · 교사 화면</title>
+<title>조선 국정 회의 · 의정부 · 교사 화면</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
@@ -20,7 +20,8 @@ main{max-width:1500px}
 .timer{font-family:var(--display); font-weight:800; font-size:26px; font-variant-numeric:tabular-nums}
 .bigev{display:grid; grid-template-columns:260px 1fr; gap:22px; align-items:center; border-left:8px solid var(--red)}
 .bigev h2{font-size:38px; margin:4px 0 10px} .bigev p{font-size:20px; line-height:1.75; margin:0; max-width:56ch}
-.hchoices{display:grid; grid-template-columns:repeat(3,1fr); gap:12px}
+.hpols{display:grid; grid-template-columns:repeat(4,1fr); gap:10px}
+.hpols .pol{cursor:default}
 .hchoices .ch{cursor:default} .hchoices .ch b{font-size:19px}
 .podium{display:grid; grid-template-columns:1fr 1.15fr 1fr; gap:14px; align-items:end}
 .pd{background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; text-align:center}
@@ -29,7 +30,7 @@ main{max-width:1500px}
 .joinbox{display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:center}
 
 .evgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(420px,1fr)); gap:12px}
-@media (max-width:1000px){ .rv{grid-template-columns:1fr!important} .evgrid{grid-template-columns:1fr} .kings{grid-template-columns:repeat(2,1fr)} .bigev{grid-template-columns:1fr} .hchoices,.podium,.joinbox{grid-template-columns:1fr} }
+@media (max-width:1000px){ .rv{grid-template-columns:1fr!important} .evgrid{grid-template-columns:1fr} .kings{grid-template-columns:repeat(2,1fr)} .bigev{grid-template-columns:1fr} .hpols{grid-template-columns:repeat(2,1fr)} .podium,.joinbox{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -37,8 +38,6 @@ main{max-width:1500px}
 <main id="app"></main>
 <script src="config.js"></script>
 <script src="scenarios.js"></script>
-<script src="cards.js"></script>
-<script src="advisors.js"></script>
 <script src="core.js"></script>
 <script src="art.js"></script>
 <script src="scenes.js"></script>
@@ -47,10 +46,9 @@ main{max-width:1500px}
 <script src="server/server.gs.js"></script>
 <script src="demo.js"></script>
 <script>
-const KEY='joseon-host-v2';
-function alertBoxSafe(){}
+const KEY='joseon-host-v3';
 const $app=document.getElementById('app');
-let H=load(), room=null, ver=0, shown='', timer=null, tick=null, pick='sejong';
+let H=load(), room=null, ver=0, shown='', timer=null, tick=null;
 function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(H)); }catch(e){} }
 function joinUrl(){ return location.origin + location.pathname.replace(/host\.html$/,''); }
@@ -66,20 +64,18 @@ function poll(){
 }
 function render(){
   if(!room){ shown=''; return vSetup(); }
-  document.getElementById('who').textContent = (room.sid?scenOf(room).king+' 시대':'모둠별 왕 선택')+' · 방 '+room.code+(room.cls?' · '+room.cls:'');
+  document.getElementById('who').textContent = ERA.title+' · 방 '+room.code+(room.cls?' · '+room.cls:'');
   const k=room.phase+':'+room.turn;
   if(k===shown){ live(); return; }
   shown=k;
   ({lobby:vLobby, deciding:vDecide, revealed:vReveal, ended:vEnd})[room.phase]();
 }
 function live(){
-  const fb=document.getElementById('feed'); if(fb) fb.innerHTML=feedHTML();
-  const gc=document.getElementById('gcount'); if(gc) gc.innerHTML=groupCount();
   const g=document.getElementById('live'); if(g && room.phase!=='revealed') g.innerHTML=gridHTML();
   const c=document.getElementById('ctl'); if(c) c.innerHTML=ctlHTML();
   const lb=document.getElementById('lb'); if(lb && room.phase!=='revealed') lb.innerHTML=leaderboardHTML(room);
 }
-function gridHTML(){ return room.teams.length ? '<div class="teams">'+room.teams.map(t=>teamCard(room,t,{members:true})).join('')+'</div>' : '<p class="muted">아직 입궐한 모둠이 없습니다.</p>'; }
+function gridHTML(){ return room.teams.length ? '<div class="teams">'+room.teams.map(t=>teamCard(room,t,{members:true})).join('')+'</div>' : '<p class="muted">아직 입궐한 의정부가 없습니다.</p>'; }
 function cmd(c, btn){
   if(btn){ btn.disabled=true; }
   API.post({action:'host', code:H.code, hostKey:H.hostKey, cmd:c}).then(j=>{ if(!j.ok){ alertBox(j.error); if(btn) btn.disabled=false; return; } ver=0; poll(); })
@@ -87,14 +83,14 @@ function cmd(c, btn){
 }
 function alertBox(m){ const e=document.getElementById('hmsg'); if(e){ e.textContent=m; } }
 function ctlHTML(){
-  const s={turns:{length:room.total}}, n=room.teams.filter(t=>t.submitted).length, N=room.teams.length;
+  const n=room.teams.filter(t=>t.submitted).length, N=room.teams.length, P=room.teams.reduce((a,t)=>a+t.members.length,0);
   let left='', right='';
-  if(room.phase==='lobby'){ left=`<span class="pill navy">입궐한 모둠 ${N}</span>${DEMO?`<button class="btn" data-act="bots">체험용 가상 모둠 3개 추가</button><a class="btn jade" href="index.html?room=${room.code}" target="_blank" rel="noopener">모둠 화면 열기(새 탭)</a>`:''}`; right=`<button class="btn primary big" data-cmd="open" ${N?'':'disabled'}>첫 사건 열기</button>`; }
-  if(room.phase==='deciding'){ left=`<span class="timer" id="timer">00:00</span><span class="pill ${n===N?'good':'navy'}" style="font-size:15px">어명 제출 ${n}/${N}</span>`;
-    right=`<button class="btn primary big" data-cmd="reveal">${n<N?'결과 공개 ('+(N-n)+'모둠 미제출)':'결과 공개'}</button>`; }
-  if(room.phase==='revealed'){ const last=room.turn+1>=s.turns.length; left=`<span class="pill good" style="font-size:15px">사건 ${room.turn+1}/${s.turns.length} 결과</span>`;
+  if(room.phase==='lobby'){ left=`<span class="pill navy">의정부 ${N} · 학생 ${P}</span>${DEMO?`<button class="btn" data-act="bots">체험용 가상 의정부 3개 추가</button><a class="btn jade" href="index.html?room=${room.code}" target="_blank" rel="noopener">학생 화면 열기(새 탭)</a>`:''}`; right=`<button class="btn primary big" data-cmd="open" ${N?'':'disabled'}>첫 사건 열기</button>`; }
+  if(room.phase==='deciding'){ left=`<span class="timer" id="timer">00:00</span><span class="pill ${n===N?'good':'navy'}" style="font-size:15px">합의안 상신 ${n}/${N}</span>`;
+    right=`<button class="btn primary big" data-cmd="reveal">${n<N?'결과 공개 ('+(N-n)+'곳 미상신)':'결과 공개'}</button>`; }
+  if(room.phase==='revealed'){ const last=room.turn+1>=ERA.turns.length; left=`<span class="pill good" style="font-size:15px">사건 ${room.turn+1}/${ERA.turns.length} 결과</span>`;
     right=`<button class="btn primary big" data-cmd="open">${last?'최종 결과 보기':'다음 사건 열기'}</button>`; }
-  if(room.phase==='ended'){ const f=room.teams.filter(t=>t.final).length; left=`<span class="pill navy" style="font-size:15px">성찰 제출 ${f}/${N}</span>`; right=`<button class="btn" data-act="newroom">새 방 만들기</button>`; }
+  if(room.phase==='ended'){ const f=room.teams.reduce((a,t)=>a+t.members.filter(m=>m.final).length,0); left=`<span class="pill navy" style="font-size:15px">성찰 제출 ${f}/${P}명</span>`; right=`<button class="btn" data-act="newroom">새 방 만들기</button>`; }
   return `<div class="row">${left}<span class="small" id="hmsg" style="color:var(--bad)"></span></div><div class="row">${right}</div>`;
 }
 function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const e=document.getElementById('timer'); if(!e||!room||!room.openedAt) return;
@@ -104,104 +100,88 @@ function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const e=docum
 function vSetup(){
   document.getElementById('who').textContent='';
   $app.innerHTML=`<div class="stack">
-    <div class="banner">${bannerSVG(200)}<div class="over"><h1>朝鮮 國政 會議</h1><p>교사 화면 · 방을 만들고 교실 화면에 띄우세요</p></div></div>
-    ${DEMO?'<div class="note"><b>체험 모드</b> · 서버 없이 이 브라우저 안에서만 동작합니다. 방을 만든 뒤 <b>가상 모둠 추가</b>를 누르고, <b>모둠 화면 열기</b>로 새 탭에서 직접 한 모둠이 되어 보세요.</div>':''}
-    <div class="card stack"><h2 style="font-size:22px">어느 왕의 시대로 들어갈까요?</h2>
-      <div class="kings">${SCENARIOS.map(s=>`<button type="button" class="king" data-sid="${s.id}" aria-pressed="${pick===s.id}"><span class="small muted">재위 ${s.reign}</span><h3>${s.king}</h3><b style="font-size:14px">${esc(s.title)}</b><p>${esc(s.lead)}</p></button>`).join('')}</div>
-      <div class="row"><label class="f" for="cls" style="flex:0 1 200px">학급<input type="text" id="cls" placeholder="예: 2-1" autocomplete="off"></label>
-        <label class="row" style="align-self:flex-end; gap:6px; padding-bottom:10px"><input type="checkbox" id="cardson" checked> 현대 제도 카드 사용 <span class="hint">(통합사회 융합 · 모둠당 ${CARD_LIMIT}장)</span></label>
+    <div class="banner">${bannerSVG(200)}<div class="over"><h1>朝鮮 國政 會議</h1><p>교사 화면 · ${esc(ERA.title)} (${ERA.period})</p></div></div>
+    ${DEMO?'<div class="note"><b>체험 모드</b> · 서버 없이 이 브라우저 안에서만 동작합니다. 방을 만든 뒤 <b>가상 의정부 추가</b>를 누르고, <b>학생 화면 열기</b>로 새 탭에서 직접 영의정이 되어 보세요.</div>':''}
+    <div class="card stack"><h2 style="font-size:22px">${esc(ERA.title)}</h2><p style="margin:0; font-size:16px; line-height:1.8">${esc(ERA.lead)}</p>
+      <div class="tw"><table class="t"><thead><tr><th>순서</th><th>연도</th><th>사건</th></tr></thead><tbody>${ERA.turns.map((t,i)=>`<tr><td class="num">${i+1}</td><td class="num">${t.year} (${esc(t.reign)})</td><td>${esc(t.title)}${t.war?' <span class="pill bad">전쟁</span>':''}</td></tr>`).join('')}</tbody></table></div>
+      <div class="row"><label class="f" for="cls" style="flex:0 1 200px">학급<input type="text" id="cls" placeholder="예: 1-1" autocomplete="off"></label>
         <button class="btn primary big" data-act="create" style="align-self:flex-end">방 만들기</button></div>
       <div class="err" id="err"></div></div>
     <details class="card"><summary style="cursor:pointer;font-weight:700">수업 진행 방법</summary><ol>
-      <li>왕을 고르고 방을 만들면 네 글자 방 코드가 나옵니다. 교실 화면에 띄워 두세요.</li>
-      <li>모둠은 태블릿·노트북에서 <b>${esc(joinUrl())}</b> 에 들어가 방 코드로 입궐합니다.</li>
-      <li><b>첫 사건 열기</b>를 누르면 모든 모둠에 같은 사건이 나타납니다. 모둠은 토의해 대책·세금·예산·근거를 올립니다.</li>
-      <li>제출 현황이 실시간으로 보입니다. <b>결과 공개</b>를 누르면 모든 모둠의 선택, 실제 역사, 나라 모습, 순위가 함께 공개됩니다. 미제출 모둠은 "어명을 내리지 못함"으로 처리됩니다.</li>
-      <li>7개 사건이 끝나면 각 모둠이 성찰을 제출합니다. 모든 기록은 구글 시트의 <b>기록</b>·<b>제출</b> 탭에 쌓입니다.</li></ol></details>
+      <li>방을 만들면 네 글자 방 코드가 나옵니다. 교실 화면에 띄워 두세요.</li>
+      <li>학생은 각자 기기로 <b>${esc(joinUrl())}</b> 에 들어가 방 코드, 모둠(의정부) 이름, 번호·이름을 쓰고 역할(영의정, 이·호·예·병·형·공조 판서)을 고릅니다. 모둠원이 적으면 한 사람이 두 조를 겸합니다.</li>
+      <li><b>첫 사건 열기</b>를 누르면 모든 의정부에 같은 사건이 열립니다. 판서는 자기 조 정책을 근거와 <b>비슷한 현대 정책</b>을 적어 제안하고, 영의정이 최대 ${MAX_ADOPT}개를 묶어 합의안을 상신합니다.</li>
+      <li><b>결과 공개</b>를 누르면 의정부별 시행 정책, 지표 변화, 현대 정책 해설이 공개됩니다. 토의한 뒤 <b>실제 역사 공개</b>를 누르세요.</li>
+      <li>7개 사건이 끝나면 학생마다 성찰을 제출합니다. 구글 시트의 <b>기록</b>(의정부별 합의안), <b>제안</b>(학생별 제안·현대 정책), <b>제출</b>(개인 성찰) 탭에 쌓입니다.</li></ol></details>
   </div>`;
 }
 
 /* ---------- 대기실 ---------- */
 function vLobby(){
-  const s=scenOf(room);
-  const info = s ? `<div class="eyebrow">재위 ${s.reign}</div><h2 style="font-size:30px">${s.king} · ${esc(s.title)}</h2><p style="font-size:16px; line-height:1.8; margin:6px 0 0">${esc(s.lead)}</p>`
-    : `<div class="eyebrow">모둠별 왕 선택</div><h2 style="font-size:30px">각 모둠이 다스릴 왕을 고릅니다</h2><div class="row" style="margin-top:10px" id="gcount">${groupCount()}</div>`;
   $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">
-    <div class="card joinbox"><div><div class="eyebrow">방 코드</div><div class="code">${room.code}</div><p class="muted" style="margin:8px 0 0; font-size:17px">접속 주소 <b style="color:var(--ink)">${esc(joinUrl())}</b></p></div><div>${info}</div></div>
-    <div class="card"><h3 style="font-size:20px; margin-bottom:10px">입궐한 모둠</h3><div id="live">${gridHTML()}</div></div>
-    ${room.cardsOn?`<div class="card stack"><h3 style="font-size:20px">현대 제도 카드 <span class="small muted" style="font-family:var(--body)">모둠마다 ${CARD_LIMIT}장까지, 사건마다 1장</span></h3><div class="deck">${CARDS.map(cd=>cardHTML(cd,{})).join('')}</div></div>`:''}</div>`;
+    <div class="card joinbox"><div><div class="eyebrow">방 코드</div><div class="code">${room.code}</div><p class="muted" style="margin:8px 0 0; font-size:17px">접속 주소 <b style="color:var(--ink)">${esc(joinUrl())}</b></p></div>
+      <div><div class="eyebrow">${ERA.period}</div><h2 style="font-size:30px">${esc(ERA.title)}</h2><div class="row" style="margin-top:10px; gap:6px">${ROLES.map(r=>roleTag(r.id)).join('')}</div>
+        <p class="small muted" style="margin:8px 0 0">영의정이 합의안을 상신하고, 6조 판서가 자기 조의 정책을 제안합니다.</p></div></div>
+    <div class="card"><h3 style="font-size:20px; margin-bottom:10px">입궐한 의정부</h3><div id="live">${gridHTML()}</div></div></div>`;
 }
-function groupCount(){ return SCENARIOS.map(s=>{ const n=room.teams.filter(t=>t.sid===s.id).length; return `<span class="pill ${n?'navy':''}" style="font-size:14px">${s.king} ${n}</span>`; }).join(''); }
 
 /* ---------- 결정 중 ---------- */
+function stepsHTML(){ return `<div class="row between"><div class="steps">${ERA.turns.map((_,i)=>`<i class="${i<room.turn?'d':i===room.turn?'n':''}"></i>`).join('')}</div><span class="muted">사건 ${room.turn+1}/${ERA.turns.length} · 방 코드 <b style="color:var(--red); letter-spacing:.15em">${room.code}</b></span></div>`; }
 function vDecide(){
-  const G=groups(room), steps=`<div class="row between"><div class="steps">${Array.from({length:room.total},(_,i)=>`<i class="${i<room.turn?'d':i===room.turn?'n':''}"></i>`).join('')}</div><span class="muted">사건 ${room.turn+1}/${room.total} · 방 코드 <b style="color:var(--red); letter-spacing:.15em">${room.code}</b></span></div>`;
-  if(G.length<=1){
-    const s=G.length?G[0].s:scenOf(room), turn=s.turns[room.turn];
-    $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">${steps}
-      <div class="card evscene">${eventScene(turn.art, turn.war)}<div><div class="yr" style="font-size:18px">${turn.year}년 · ${s.king} 시대</div><h2>${esc(turn.title)}</h2><p>${esc(turn.text)}</p>${turn.war?'<p style="margin-top:10px"><span class="pill bad" style="font-size:15px">전쟁 · 국방력이 피해를 좌우합니다</span></p>':''}</div></div>
-      <div class="hchoices">${turn.choices.map((c,i)=>`<div class="ch"><span class="lt">${'甲乙丙'[i]}</span><b>${esc(c.label)}</b><span>${esc(c.desc)}</span></div>`).join('')}</div>
-      <div class="feedbox" id="feed">${feedHTML()}</div>
-      <div class="card"><h3 style="font-size:20px; margin-bottom:10px">모둠별 논의 현황</h3><div id="live">${gridHTML()}</div></div></div>`;
-  } else {
-    $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">${steps}
-      <div class="evgrid">${G.map(g=>{ const turn=g.s.turns[room.turn]; return `<div class="card stack" style="border-left:6px solid var(--red)">
-        ${eventScene(turn.art, turn.war)}<div class="row" style="align-items:flex-start; flex-wrap:nowrap">
-        <div><div class="yr">${g.s.king} · ${turn.year}년</div><h3 style="font-size:22px">${esc(turn.title)}</h3><p class="small" style="margin:4px 0 0">${esc(turn.text)}</p></div></div>
-        <div class="small muted">${turn.choices.map((c,i)=>'甲乙丙'[i]+' '+esc(c.label)).join(' · ')}</div></div>`; }).join('')}</div>
-      <div class="feedbox" id="feed">${feedHTML()}</div>
-      <div class="card"><h3 style="font-size:20px; margin-bottom:10px">모둠별 논의 현황</h3><div id="live">${gridHTML()}</div></div></div>`;
-  }
+  const turn=curTurn(room);
+  $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">${stepsHTML()}
+    <div class="card evscene">${eventScene(turn.art, turn.war)}<div><div class="yr" style="font-size:18px">${turn.year}년 · ${esc(turn.reign)}</div><h2>${esc(turn.title)}</h2><p>${esc(turn.text)}</p>${turn.war?'<p style="margin-top:10px"><span class="pill bad" style="font-size:15px">전쟁 · 국방력이 피해를 좌우합니다</span></p>':''}</div></div>
+    <div class="card stack"><h3 style="font-size:20px">6조의 정책 <span class="small muted" style="font-family:var(--body)">의정부마다 최대 ${MAX_ADOPT}개를 묶어 시행</span></h3>
+      <div class="hpols">${turn.policies.map(p=>policyHTML(turn,p)).join('')}</div></div>
+    <div class="card"><h3 style="font-size:20px; margin-bottom:10px">의정부별 논의 현황</h3><div id="live">${gridHTML()}</div></div></div>`;
   startTimer();
 }
 
 /* ---------- 결과 공개 ---------- */
-function feedHTML(){
-  const f=(room.feed||[]).slice(-4).reverse();
-  return f.length?f.map(e=>{ const a=advisorById(e.adv); return `<div class="fi ${e.kind==='unlock'?'unlock-k':''}"><div>${a?advisorSVG(a,false):''}</div><div>${esc(e.text)}</div></div>`; }).join(''):'';
-}
-function cardsUsed(teams){
-  const rows=teams.map(t=>{ const l=t.log.find(x=>x.t===room.turn); const cd=l&&l.card&&cardById(l.card); return cd?`<div class="cardnote"><b>${esc(t.name)}</b> · 현대의 ${esc(cd.modern)} → 「${esc(cd.name)}」 <span class="small muted">${esc(cd.concept)}</span></div>`:''; }).join('');
-  return rows?`<div class="stack" style="gap:6px"><h3 style="font-size:16px">이번에 시행된 현대 제도</h3>${rows}</div>`:'';
+function modernAll(turn){
+  const by={};
+  room.teams.forEach(t=>{ const l=t.log.find(x=>x.t===room.turn); if(l) l.adopt.forEach(a=>{ (by[a.id]=by[a.id]||[]).push({team:t.name, a}); }); });
+  const ids=turn.policies.map(p=>p.id).filter(id=>by[id]);
+  if(!ids.length) return '';
+  return `<div class="card stack"><h3 style="font-size:20px">조선의 정책 ↔ 현대 정책</h3><p class="small muted" style="margin:0">학생들이 쓴 비슷한 현대 정책과 해설을 비교해 보세요.</p>
+    ${ids.map(id=>{ const p=policyOf(turn,id); return `<div class="modern"><div class="mh2"><b>${esc(p.name)}</b><span class="small muted">${by[id].length}곳 시행</span></div>
+      <div class="mrow"><div class="mine"><span>학생들이 쓴 현대 정책</span>${by[id].map(x=>`<p><b>${esc(x.team)}</b> · ${esc(x.a.modern)} <span class="muted small">(${esc(x.a.by)})</span></p>`).join('')}</div>
+      <div class="ref"><span>해설 · ${esc(UNITS[p.modern.u]||'')}</span><b>${esc(p.modern.name)}</b><p>${esc(p.modern.text)}</p></div></div></div>`; }).join('')}</div>`;
 }
 function vReveal(){
-  const G=groups(room);
-  const blocks=G.map((g,gi)=>{ const turn=g.s.turns[room.turn];
-    const achs=g.teams.map(t=>{ const l=t.log.find(x=>x.t===room.turn); return l&&l.ach?`<span class="ach" data-at="${2600+gi*300}" data-fx="confetti">業 ${esc(t.name)} · ${esc(l.ach)}</span>`:''; }).join('');
-    const crises=g.teams.map(t=>{ const l=t.log.find(x=>x.t===room.turn); return l?l.notes.filter(n=>n.type==='crisis').map(n=>`<span class="pill bad">${esc(t.name)} · ${esc(n.text)}</span>`).join(''):''; }).join('');
-    const anyMatch=g.teams.some(t=>{ const l=t.log.find(x=>x.t===room.turn); return l&&l.real; });
-    return `<div class="card stack"><div class="evscene" style="border:none; grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)">${eventScene(turn.art, turn.war)}<div><div class="yr" style="font-size:17px">${g.s.king} · ${turn.year}년</div><h2 style="font-size:${G.length>1?26:32}px">${esc(turn.title)} · 모둠들의 선택</h2></div></div>
-      <div data-at="${300+gi*400}" data-fx="chips">${distAnimHTML(room, room.turn, null, g.s.id)}</div>
+  const turn=curTurn(room);
+  const crises=room.teams.map(t=>{ const l=t.log.find(x=>x.t===room.turn); return l?l.notes.filter(n=>n.type==='crisis'||n.type==='combo'||n.type==='clash').map(n=>`<span class="pill ${n.type==='combo'?'good':'bad'}">${esc(t.name)} · ${esc(n.text)}</span>`).join(''):''; }).join('');
+  const anyMatch=room.teams.reduce((a,t)=>{ const l=t.log.find(x=>x.t===room.turn); return Math.max(a, l?l.matches:0); },0);
+  $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack" id="rv">
+    <div class="card stack"><div class="evscene" style="border:none; grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)">${eventScene(turn.art, turn.war)}<div><div class="yr" style="font-size:17px">${turn.year}년 · ${esc(turn.reign)}</div><h2 style="font-size:32px">${esc(turn.title)} · 의정부들의 선택</h2></div></div>
+      <div data-at="300" data-fx="chips">${distAnimHTML(room, room.turn, null)}</div>
       ${realFlipHTML(turn, anyMatch, null, true)}
-      ${achs||crises?`<div class="row">${achs}${crises}</div>`:''}${cardsUsed(g.teams)}</div>`; }).join('');
-  $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack" id="rv"><div class="feedbox" id="feed">${feedHTML()}</div>${blocks}
+      ${crises?`<div class="row">${crises}</div>`:''}</div>
+    ${modernAll(turn)}
     <div style="display:grid; grid-template-columns:1fr 380px; gap:16px; align-items:start" class="rv">
       <div class="card"><h3 style="font-size:20px; margin-bottom:10px">각 나라의 모습</h3><div id="live">${gridHTML()}</div></div>
-      <div class="card"><h3 style="font-size:20px; margin-bottom:10px">순위</h3><div id="lbwrap"><div data-at="2200" data-fx="rank">${lbAnimHTML(room,null,room.turn)}</div></div></div></div></div>`;
+      <div class="card"><h3 style="font-size:20px; margin-bottom:10px">순위</h3><div data-at="2200" data-fx="rank">${lbAnimHTML(room,null,room.turn)}</div></div></div></div>`;
   runStages(document.getElementById('rv'));
 }
 
 /* ---------- 최종 ---------- */
 function vEnd(){
-  const s=scenOf(room), list=ranked(room), top=[list[1],list[0],list[2]];
-  const title=s?s.king+' 치세 종료':'모든 치세 종료';
+  const list=ranked(room), top=[list[1],list[0],list[2]];
   $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">
-    <div class="banner">${bannerSVG(170)}<div class="over"><div class="eyebrow" style="color:#f3d9a0">${title}</div><h1>최고의 국정을 펼친 모둠은?</h1></div></div>
-    <div class="podium">${top.map((t,i)=>t?`<div class="pd ${i===1?'p1':''}"><div class="pl">${[2,1,3][i]}위</div><h3 style="font-size:24px">${esc(t.name)}</h3><div class="small muted">${esc(teamScen(room,t).king)} 시대</div><div class="sc" style="font-family:var(--display);font-size:30px;font-weight:800;color:var(--red)">${t.score}점</div>${kingdomSVG(t.st)}<p class="small" style="margin:6px 0 0">${t.ending?esc(t.ending.title)+' · ':''}업적 ${t.ach.length} · 실제 역사 일치 ${t.matches}/${t.log.length}</p></div>`:'<div></div>').join('')}</div>
+    <div class="banner">${bannerSVG(170)}<div class="over"><div class="eyebrow" style="color:#f3d9a0">${ERA.period} 회의 종료</div><h1>최고의 국정을 펼친 의정부는?</h1></div></div>
+    <div class="podium">${top.map((t,i)=>t?`<div class="pd ${i===1?'p1':''}"><div class="pl">${[2,1,3][i]}위</div><h3 style="font-size:24px">${esc(t.name)}</h3><div class="small muted">${t.members.map(m=>esc(m.name)).join(', ')}</div><div class="sc" style="font-family:var(--display);font-size:30px;font-weight:800;color:var(--red)">${t.score}점</div>${kingdomSVG(t.st)}<p class="small" style="margin:6px 0 0">위기 ${t.crises.length} · 실제 역사와 같은 정책 ${t.matches}개</p></div>`:'<div></div>').join('')}</div>
     <div class="card"><h3 style="font-size:20px; margin-bottom:10px">전체 순위</h3><div id="lb">${leaderboardHTML(room)}</div></div>
     <div class="card"><h3 style="font-size:20px; margin-bottom:10px">각 나라의 최종 모습</h3><div id="live">${gridHTML()}</div></div></div>`;
 }
 
 /* ---------- 이벤트 ---------- */
 document.addEventListener('click', e=>{
-  const cdb=e.target.closest('[data-card]'); if(cdb){ openModal(cardModalHTML(cardById(cdb.dataset.card))); return; }
-  const t=e.target.closest('[data-sid],[data-act],[data-cmd]'); if(!t||t.disabled) return;
-  if(t.dataset.sid){ pick=t.dataset.sid; document.querySelectorAll('.king').forEach(b=>b.setAttribute('aria-pressed', b.dataset.sid===pick)); return; }
+  const t=e.target.closest('[data-act],[data-cmd]'); if(!t||t.disabled) return;
   if(t.dataset.cmd) return cmd(t.dataset.cmd, t);
   const a=t.dataset.act;
   if(a==='flipreal'){ const fc=t.closest('.flipcard'); FX.flip(fc, false); return; }
-  if(a==='create'){ if(!pick) return fail('왕을 고르세요.'); t.disabled=true;
-    API.post({action:'create', sid:pick, cards:document.getElementById('cardson').checked, cls:document.getElementById('cls').value.trim()}).then(j=>{ if(!j.ok){ t.disabled=false; return fail(j.error); } H={code:j.code, hostKey:j.hostKey}; save(); ver=0; poll(); })
+  if(a==='create'){ t.disabled=true;
+    API.post({action:'create', cls:document.getElementById('cls').value.trim()}).then(j=>{ if(!j.ok){ t.disabled=false; return fail(j.error); } H={code:j.code, hostKey:j.hostKey}; save(); ver=0; poll(); })
       .catch(()=>{ t.disabled=false; fail('서버에 연결하지 못했습니다. config.js의 서버 주소를 확인하세요.'); }); }
   if(a==='bots'){ t.disabled=true; addBots(H.code).then(()=>{ ver=0; poll(); }); return; }
   if(a==='newroom'){ H={}; save(); room=null; ver=0; render(); }

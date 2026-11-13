@@ -6,8 +6,7 @@ function prevStats(t){ return t.hist.length >= 2 ? t.hist[t.hist.length - 2] : t
 function prevScore(t, turnIdx){
   const l = t.log.find(x => x.t === turnIdx);
   if (!l) return t.score;
-  const g = {st: prevStats(t), ach: t.ach.filter(a => a !== l.ach), crises: t.crises.filter(c => c.year !== l.year), ending: null};
-  return scoreOf(g);
+  return scoreOf({st: prevStats(t), crises: t.crises.filter(c => c.year !== l.year)});
 }
 
 /* 단계 실행: [data-at] 요소가 지정한 시간(ms)에 나타나고 data-fx 효과를 실행 */
@@ -108,15 +107,18 @@ function lbAnimHTML(room, myId, turnIdx){
   return '<div class="lb">' + byPrev.map((r, i) => `<div class="lbr ${r.t.id === myId ? 'me' : ''}" data-score="${r.t.score}" data-prev="${r.prev}" data-prevrank="${i + 1}">
     <span class="num muted">${i + 1}</span><b>${esc(r.t.name)} <span class="mv"></span></b><span class="bb"><i style="width:${Math.max(2, r.prev / max * 100)}%"></i></span><span class="s num">${r.prev}</span></div>`).join('') + '</div>';
 }
-function distAnimHTML(room, turnIdx, myId, sid){
-  const s = scenById(sid || room.sid), turn = s.turns[turnIdx], by = {a: [], b: [], c: [], '-': []};
-  room.teams.filter(t => t.sid === s.id).forEach(t => { const l = t.log.find(x => x.t === turnIdx); if (l) (by[l.choice || '-'] || by['-']).push(t); });
-  return `<div class="dist">${turn.choices.map((c, i) => `<div class="dc" data-real="${c.id === turn.real.pick ? 1 : 0}"><div class="row between"><h4>${'甲乙丙'.charAt(i)} ${esc(c.label)}</h4><span class="cnt num" data-to="${by[c.id].length}">0</span></div>
-    <div class="chips">${by[c.id].map(t => `<span class="chip ${t.id === myId ? 'me' : ''}">${esc(t.name)}</span>`).join('') || '<span class="small muted">없음</span>'}</div></div>`).join('')}</div>
-    ${by['-'].length ? `<p class="small muted" style="margin:6px 0 0">어명을 내리지 못한 모둠: ${by['-'].map(t => esc(t.name)).join(', ')}</p>` : ''}`;
+/* 정책별로 어느 의정부가 시행했는지 */
+function distAnimHTML(room, turnIdx, myId){
+  const turn = ERA.turns[turnIdx], by = {}, none = [];
+  turn.policies.forEach(p => by[p.id] = []);
+  room.teams.forEach(t => { const l = t.log.find(x => x.t === turnIdx); if (!l) return; if (!l.adopt.length) none.push(t); l.adopt.forEach(a => by[a.id] && by[a.id].push(t)); });
+  return `<div class="dist pdist">${turn.policies.map(p => { const d = deptOf(p.id); return `<div class="dc" data-real="${turn.real.ids.includes(p.id) ? 1 : 0}"><div class="row between"><h4><i class="dico r-${d.id}">${d.icon}</i> ${esc(p.name)}</h4><span class="cnt num" data-to="${by[p.id].length}">0</span></div>
+    <div class="chips">${by[p.id].map(t => `<span class="chip ${t.id === myId ? 'me' : ''}">${esc(t.name)}</span>`).join('') || '<span class="small muted">없음</span>'}</div></div>`; }).join('')}</div>
+    ${none.length ? `<p class="small muted" style="margin:6px 0 0">합의안을 올리지 못한 의정부: ${none.map(t => esc(t.name)).join(', ')}</p>` : ''}`;
 }
-function realFlipHTML(turn, match, at, manual){
-  return `<div class="flipcard ${manual ? 'manual' : ''}" ${at != null ? `data-at="${at}" data-fx="flip"` : ''} data-match="${match ? 1 : 0}">
-    <div class="fc-in"><div class="fc-front"><span class="seal" style="width:44px;height:44px;font-size:22px">史</span><b>실제 역사에서 왕은 무엇을 택했을까?</b>${manual ? '<button class="btn primary" data-act="flipreal">실제 역사 공개</button>' : '<span class="small">곧 공개됩니다…</span>'}</div>
-    <div class="fc-back"><b class="tit">실제 역사에서는</b>${match ? '<span class="matchst">史實 일치</span>' : ''}<p>${esc(turn.real.text)}</p></div></div></div>`;
+function realFlipHTML(turn, n, at, manual){
+  const names = turn.real.ids.map(id => policyOf(turn, id).name);
+  return `<div class="flipcard ${manual ? 'manual' : ''}" ${at != null ? `data-at="${at}" data-fx="flip"` : ''} data-match="${n ? 1 : 0}">
+    <div class="fc-in"><div class="fc-front"><span class="seal" style="width:44px;height:44px;font-size:22px">史</span><b>실제 역사에서 조정은 어떤 정책을 시행했을까?</b>${manual ? '<button class="btn primary" data-act="flipreal">실제 역사 공개</button>' : '<span class="small">곧 공개됩니다…</span>'}</div>
+    <div class="fc-back"><b class="tit">실제 역사에서는 · ${names.map(esc).join(' + ')}</b>${n ? `<span class="matchst">史實 ${n}개 일치</span>` : ''}<p>${esc(turn.real.text)}</p></div></div></div>`;
 }

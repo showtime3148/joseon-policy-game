@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>조선 국정 회의</title>
+<title>조선 국정 회의 · 의정부</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
@@ -17,12 +17,10 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="top-in"><div><b>朝鮮 國政 會議</b> <span class="sub">조선 국정 회의 · 모둠 화면</span></div><div class="row"><span class="sub" id="who"></span><span class="conn" id="conn"><i></i> 대기</span></div></div></header>
+<header class="top"><div class="top-in"><div><b>朝鮮 國政 會議</b> <span class="sub">의정부 회의 · 학생 화면</span></div><div class="row"><span class="sub" id="who"></span><span class="conn" id="conn"><i></i> 대기</span></div></div></header>
 <main id="app"></main>
 <script src="config.js"></script>
 <script src="scenarios.js"></script>
-<script src="cards.js"></script>
-<script src="advisors.js"></script>
 <script src="core.js"></script>
 <script src="art.js"></script>
 <script src="scenes.js"></script>
@@ -31,16 +29,19 @@
 <script src="server/server.gs.js"></script>
 <script src="demo.js"></script>
 <script>
-const KEY='joseon-team-v2', MIN_WHY=30, MIN_REF=40;
-const BUD_COLORS={df:'#24384c', lv:'#2f6b5e', cu:'#a97c25'};
+const KEY='joseon-ui-v3', MIN_WHY=30, MIN_PWHY=15, MIN_REF=40;
 const $app=document.getElementById('app');
-let L=load(), room=null, ver=0, shown='', editing=false, timer=null;
+let L=load(), room=null, ver=0, shown='', editing=false, timer=null, joinRoles=[];
 function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(L)); }catch(e){} }
 function me(){ return room && room.teams.find(t=>t.id===L.teamId); }
-function myScen(){ return teamScen(room, me()); }
+function mine(){ const t=me(); return t && t.members.find(m=>m.id===L.memberId); }
 function v(id){ const e=document.getElementById(id); return e?e.value:''; }
-function fail(m){ const e=document.getElementById('err'); if(e){ e.textContent=m; e.scrollIntoView({block:'center'}); } }
+function fail(m, id){ const e=document.getElementById(id||'err'); if(e){ e.textContent=m; e.scrollIntoView({block:'center'}); } }
+function uHasRole(t, r){ return t.members.some(m=>m.roles.includes(r)); }
+function uCanPropose(pid){ const t=me(), m=mine(), d=pid.charAt(0); return m.roles.includes(d) || (m.roles.includes('yeong') && !uHasRole(t,d)); }
+function uCanDecide(){ const t=me(), m=mine(); return m.roles.includes('yeong') || !uHasRole(t,'yeong'); }
+function props(){ return (room&&room.myProps)||{}; }
 
 /* ---------- 실시간 갱신 ---------- */
 function poll(){
@@ -51,15 +52,15 @@ function poll(){
     if(!j.ok){ if(/찾을 수 없/.test(j.error||'')){ L={}; save(); room=null; render(); } return; }
     if(j.same) return;
     room=j.room; ver=room.ver;
-    if(!me()){ L.teamId=null; save(); room=null; render(); return; }
+    if(!me()||!mine()){ L.teamId=null; save(); room=null; render(); return; }
     render();
   }).catch(()=>setConn(false)).finally(()=>{ timer=setTimeout(poll, 2500); });
 }
-function key(){ const m=me(); return [m.sid, room.myAdvice?room.myAdvice.id:'', room.phase, room.turn, m.submitted?1:0, m.final?1:0, editing?1:0].join(':'); }
+function key(){ const t=me(), m=mine(); return [room.phase, room.turn, room.mySub?1:0, m.final?1:0, editing?1:0, m.roles.join('')].join(':'); }
 function render(){
   if(!room){ shown=''; return vJoin(); }
-  const s=myScen(), m=me();
-  document.getElementById('who').textContent = m.name+' 모둠 · '+s.king+' 시대 · 방 '+room.code;
+  const t=me(), m=mine();
+  document.getElementById('who').textContent = t.name+' 의정부 · '+m.name+' ('+m.roles.map(r=>roleById(r).name).join('·')+') · 방 '+room.code;
   const k=key();
   if(k===shown){ liveUpdate(); return; }
   shown=k;
@@ -67,268 +68,279 @@ function render(){
   window.scrollTo(0,0);
 }
 function liveUpdate(){
-  if(room.phase==='revealed') return;
-  const g=document.getElementById('live'); if(g) g.innerHTML=othersHTML();
-  const lb=document.getElementById('lb'); if(lb) lb.innerHTML=leaderboardHTML(room, L.teamId);
-  const st=document.getElementById('subst'); if(st) st.innerHTML=subStatus();
+  const set=(id,h)=>{ const e=document.getElementById(id); if(e) e.innerHTML=h; };
+  if(room.phase!=='revealed') set('live', othersHTML());
+  set('mem', membersHTML());
+  set('subst', subStatus());
+  if(room.phase==='deciding'){ set('pols', polsHTML()); set('plist', propListHTML()); set('pack', packHTML()); updPreview(); }
 }
 function othersHTML(){ return '<div class="teams">'+room.teams.map(t=>teamCard(room,t,{me:t.id===L.teamId})).join('')+'</div>'; }
-function subStatus(){ const n=room.teams.filter(t=>t.submitted).length; return `<span class="pill ${n===room.teams.length?'good':'navy'}">어명 제출 ${n}/${room.teams.length} 모둠</span>`; }
+function subStatus(){ const n=room.teams.filter(t=>t.submitted).length; return `<span class="pill ${n===room.teams.length?'good':'navy'}">합의안 상신 ${n}/${room.teams.length} 의정부</span>`; }
+function membersHTML(){
+  const t=me(), vac=ROLES.filter(r=>r.id!=='yeong'&&!uHasRole(t,r.id));
+  return `<div class="stack" style="gap:6px">${t.members.map(m=>`<div class="mrow2 ${m.id===L.memberId?'me':''}">${memberLine(m)}</div>`).join('')}</div>
+    ${!uHasRole(t,'yeong')?'<p class="note" style="margin:8px 0 0">영의정이 없습니다. 합의안은 모둠원 누구나 올릴 수 있습니다.</p>':''}
+    ${vac.length?`<p class="small muted" style="margin:8px 0 0">판서가 없는 조: ${vac.map(r=>r.dept).join(', ')} → 영의정이 대신 제안합니다.</p>`:''}`;
+}
+function rolePickHTML(sel, taken){
+  return '<div class="rolepick">'+ROLES.map(r=>{ const tk=taken&&taken[r.id]; return `<label class="rp ${tk?'taken':''}"><input type="checkbox" value="${r.id}" data-role ${sel.includes(r.id)?'checked':''} ${tk?'disabled':''}><span><i class="r-${r.id}">${r.icon}</i><b>${r.name}</b><small>${tk?esc(tk)+' 학생이 맡음':esc(r.duty)}</small></span></label>`; }).join('')+'</div>';
+}
 
 /* ---------- 참가 ---------- */
 function vJoin(){
   document.getElementById('who').textContent='';
   const q=new URLSearchParams(location.search).get('room')||'';
+  joinRoles=L.roles||[];
   $app.innerHTML=`<div class="stack">
-    <div class="banner">${bannerSVG(220)}<div class="over"><h1>朝鮮 國政 會議</h1><p>모둠이 한 나라를 맡아 조선의 위기를 해결합니다</p></div></div>
-    ${DEMO?'<div class="note" style="max-width:560px;margin:0 auto;width:100%"><b>체험 모드</b> · 먼저 <a href="host.html" target="_blank" rel="noopener">교사 화면</a>을 새 탭에서 열어 방을 만든 뒤, 그 방 코드로 들어오세요. 같은 브라우저 안에서만 동작합니다.</div>':''}
+    <div class="banner">${bannerSVG(200)}<div class="over"><h1>朝鮮 國政 會議</h1><p>${ERA.period} · 의정부가 되어 조선 후기의 위기를 해결합니다</p></div></div>
+    ${DEMO?'<div class="note" style="max-width:900px;margin:0 auto;width:100%"><b>체험 모드</b> · 먼저 <a href="host.html" target="_blank" rel="noopener">교사 화면</a>을 새 탭에서 열어 방을 만든 뒤, 그 방 코드로 들어오세요. 같은 브라우저 안에서만 동작합니다.</div>':''}
     <form class="card stack" id="join" style="max-width:900px; margin:0 auto; width:100%" novalidate>
-      <h2 style="font-size:22px">어전 회의에 참가하기</h2>
-      <label class="f" for="code">방 코드 <span class="hint">교실 화면에 보이는 네 글자</span><input type="text" id="code" value="${esc(L.code||q)}" maxlength="4" autocomplete="off" style="font-size:28px; letter-spacing:.3em; text-transform:uppercase; font-family:var(--display); font-weight:800"></label>
-      <label class="f" for="team">모둠 이름<input type="text" id="team" value="${esc(L.teamName||'')}" maxlength="20" placeholder="예: 집현전" autocomplete="off"></label>
-      <label class="f" for="members">모둠원 <span class="hint">번호와 이름, 쉼표로 구분</span><input type="text" id="members" value="${esc(L.members||'')}" placeholder="예: 3 김민준, 7 이서연, 12 박지호" autocomplete="off"></label>
+      <h2 style="font-size:22px">의정부에 들어가기</h2>
+      <div class="row" style="align-items:flex-end">
+        <label class="f" for="code" style="flex:0 1 220px">방 코드 <span class="hint">교실 화면의 네 글자</span><input type="text" id="code" value="${esc(L.code||q)}" maxlength="4" autocomplete="off" style="font-size:26px; letter-spacing:.3em; text-transform:uppercase; font-family:var(--display); font-weight:800"></label>
+        <label class="f" for="team" style="flex:1 1 200px">모둠(의정부) 이름 <span class="hint">모둠원 모두 같은 이름으로</span><input type="text" id="team" value="${esc(L.teamName||'')}" maxlength="20" placeholder="예: 청렴 의정부" autocomplete="off"></label>
+        <label class="f" for="nm" style="flex:1 1 180px">번호와 이름<input type="text" id="nm" value="${esc(L.name||'')}" maxlength="20" placeholder="예: 3 김민준" autocomplete="off"></label></div>
+      <div class="f"><b style="font-weight:500">내가 맡을 역할 <span class="hint">모둠원이 7명보다 적으면 한 사람이 두 조를 겸할 수 있습니다. 영의정은 꼭 한 명 정하세요.</span></b>${rolePickHTML(joinRoles)}</div>
       <div class="err" id="err"></div>
       <button class="btn primary big" type="submit">입궐하기</button>
-      <p class="hint" style="margin:0">같은 모둠 이름으로 다시 들어오면 이어서 할 수 있습니다. 선생님은 <a href="host.html">교사 화면</a>을 여세요.</p>
+      <p class="hint" style="margin:0">같은 모둠 이름과 같은 이름으로 다시 들어오면 이어서 할 수 있습니다. 선생님은 <a href="host.html">교사 화면</a>을 여세요.</p>
     </form></div>`;
 }
 
 /* ---------- 대기실 ---------- */
 function vLobby(){
-  const s=myScen(), m=me();
+  const t=me(), m=mine(), taken={};
+  t.members.forEach(x=>{ if(x.id!==m.id) x.roles.forEach(r=>taken[r]=x.name); });
   $app.innerHTML=`<div class="stack">
-    <div class="banner">${bannerSVG(170)}<div class="over"><div class="eyebrow" style="color:#f3d9a0">재위 ${s.reign}</div><h1>${s.king} · ${esc(s.title)}</h1></div></div>
+    <div class="banner">${bannerSVG(170)}<div class="over"><div class="eyebrow" style="color:#f3d9a0">${ERA.period}</div><h1>${esc(ERA.title)}</h1></div></div>
     <div class="play"><div class="stack">
-      <div class="card stack"><div class="row between"><h2 style="font-size:20px">즉위 당시 나라의 형편</h2><span class="pill navy">선생님이 첫 사건을 열 때까지 기다리세요</span></div>
-        <p style="margin:0; font-size:16px; line-height:1.8">${esc(s.lead)}</p>
-        <div class="mykd">${kingdomSVG(m.st)}</div></div>
-      <div class="card stack"><h3 style="font-size:18px">우리 모둠의 국정 방향</h3>
-        <label class="f" for="goal">가장 시급한 문제는 무엇이며, 어떤 지표를 먼저 살릴 것인가요?<textarea id="goal">${esc(L.goalDraft!=null?L.goalDraft:m.goal)}</textarea></label>
-        <div class="row"><button class="btn jade" data-act="goal">국정 방향 저장</button><span class="small" id="gs">${m.goal?'저장됨':''}</span></div></div>
+      <div class="card stack"><div class="row between"><h2 style="font-size:20px">우리가 맡은 나라</h2><span class="pill navy">선생님이 첫 사건을 열 때까지 기다리세요</span></div>
+        <p style="margin:0; font-size:16px; line-height:1.8">${esc(ERA.lead)}</p>
+        <div class="mykd">${kingdomSVG(t.st)}</div></div>
+      <div class="card stack"><h3 style="font-size:18px">회의 방식</h3>
+        <ol style="margin:0; padding-left:20px; line-height:1.9">
+          <li>사건이 열리면 각 판서는 <b>자기 조의 정책</b>을 살펴보고 필요한 정책을 <b>제안</b>합니다. 제안할 때 <b>근거</b>와 <b>비슷한 현대 정책</b>을 씁니다.</li>
+          <li>영의정은 제안된 정책 가운데 <b>최대 ${MAX_ADOPT}개</b>를 묶어 합의안을 만들고, 근거를 써서 <b>상신</b>합니다.</li>
+          <li>정책끼리 서로 돕기도 하고 부딪히기도 합니다. 몇 해 뒤에 나타나는 효과도 있습니다.</li>
+          <li>결과가 공개되면 실제 역사에서 시행한 정책과, 우리가 쓴 현대 정책에 대한 해설을 비교합니다.</li></ol></div>
+      <div class="card stack"><h3 style="font-size:18px">내 역할 바꾸기 <span class="small muted" style="font-family:var(--body)">첫 사건 전까지</span></h3>
+        ${rolePickHTML(m.roles, taken)}<div class="row"><button class="btn jade" data-act="roles">역할 저장</button><span class="small" id="rs"></span></div></div>
     </div>
-    <div class="side"><div class="card">${gaugesHTML(m.st)}</div>${(m.advisors&&m.advisors.have.length)?(()=>{ const a=advisorById(m.advisors.have[0]); return `<div class="unlock"><div class="p">${advisorSVG(a,false)}</div><div><div class="eyebrow" style="color:#f3d9a0">첫 히든 조언자</div><h3 style="font-size:19px">${esc(a.name)}</h3><p class="small" style="margin:4px 0 0">${esc(a.title)} · 사건 중에 한 번 조언을 청할 수 있습니다. 다른 조언자는 조건을 채우면 나타납니다.</p></div></div>`; })():''}</div></div>
-    <div class="card stack"><h3 style="font-size:18px">입궐한 모둠</h3><div id="live">${othersHTML()}</div></div></div>`;
+    <div class="side"><div class="card"><h3 style="font-size:16px;margin-bottom:8px">우리 의정부 · ${esc(t.name)}</h3><div id="mem">${membersHTML()}</div></div><div class="card">${gaugesHTML(t.st)}</div></div></div>
+    <div class="card stack"><h3 style="font-size:18px">입궐한 의정부</h3><div id="live">${othersHTML()}</div></div></div>`;
 }
 
 /* ---------- 결정 ---------- */
 function draft(){
-  const m=me();
-  if(!L.draft || L.draft.turn!==room.turn || L.draft.code!==room.code){
-    const last=m.log[m.log.length-1];
-    L.draft={code:room.code, turn:room.turn, pick:null, card:null, why:'', tax:last?last.tax:3, bud:last?Object.assign({},last.bud):{df:34,lv:33,cu:33}};
-  }
+  if(!L.draft || L.draft.turn!==room.turn || L.draft.code!==room.code) L.draft={code:room.code, turn:room.turn, adopt:[], why:''};
+  L.draft.adopt=L.draft.adopt.filter(id=>props()[id]);
   return L.draft;
 }
+function headHTML(){
+  const turn=curTurn(room);
+  return `<div class="row between" style="margin-bottom:12px"><div class="steps">${ERA.turns.map((_,i)=>`<i class="${i<room.turn?'d':i===room.turn?'n':''}"></i>`).join('')}</div><span id="subst">${subStatus()}</span></div>
+    <div class="card evscene">${eventScene(turn.art, turn.war)}<div><div class="yr">${turn.year}년 · ${esc(turn.reign)} · 사건 ${room.turn+1}/${ERA.turns.length}</div><h2>${esc(turn.title)}</h2><p>${esc(turn.text)}</p>${turn.war?'<p style="margin-top:8px"><span class="pill bad">전쟁 · 쌓아 둔 국방력이 피해를 좌우합니다</span></p>':''}</div></div>`;
+}
+function polState(pid){ const d=L.draft, pr=props()[pid]; if(d&&d.adopt.includes(pid)) return 'adopt'; return pr?'prop':''; }
+function polsHTML(){
+  const turn=curTurn(room), P=props();
+  const groups=ROLES.filter(r=>r.id!=='yeong').map(r=>({r, list:turn.policies.filter(p=>p.id.charAt(0)===r.id)})).filter(g=>g.list.length);
+  return groups.map(g=>`<div class="dept ${uCanPropose(g.list[0].id)?'mine':''}"><div class="dh"><i class="r-${g.r.id}">${g.r.icon}</i><b>${g.r.dept}</b><span class="small muted">${esc(g.r.duty)}</span>${uCanPropose(g.list[0].id)?'<span class="pill jade">내가 제안</span>':''}</div>
+    <div class="pols">${g.list.map(p=>policyHTML(turn,p,{state:polState(p.id), by:P[p.id]&&P[p.id].name})).join('')}</div></div>`).join('');
+}
+function propListHTML(){
+  const turn=curTurn(room), P=props(), ids=Object.keys(P);
+  if(!ids.length) return '<p class="muted small" style="margin:0">아직 제안된 정책이 없습니다. 판서는 자기 조의 정책을 눌러 제안하세요.</p>';
+  return ids.map(id=>{ const p=policyOf(turn,id), pr=P[id]; return `<div class="prop"><div class="row between"><b>${esc(p.name)}</b><span class="small muted">${esc(pr.name)} · ${esc(pr.role)}</span></div>
+    <p>${esc(pr.why)}</p><p class="small"><b>비슷한 현대 정책</b> ${esc(pr.modern)}</p></div>`; }).join('');
+}
+function packHTML(){
+  if(!uCanDecide()) return '<p class="small muted" style="margin:0">영의정이 제안을 모아 합의안을 만들고 있습니다. 의견이 있으면 직접 말로 전하세요.</p>';
+  const turn=curTurn(room), d=L.draft;
+  return `<p class="small muted" style="margin:0">제안된 정책을 눌러 합의안에 넣거나 뺄 수 있습니다. 최대 ${MAX_ADOPT}개.</p>
+    <div class="packlist">${d.adopt.length?d.adopt.map(id=>`<button type="button" class="pk" data-unadopt="${id}">${esc(policyOf(turn,id).name)} ✕</button>`).join(''):'<span class="small muted">아직 고른 정책이 없습니다.</span>'}</div>
+    <div class="small"><b>${d.adopt.length}/${MAX_ADOPT}</b> 정책 · 예상 방향 ${effList(packEffect(turn,d.adopt))||'-'}</div>`;
+}
 function vDecide(){
-  const s=myScen(), m=me(), turn=s.turns[room.turn], d=draft();
-  const head=`<div class="row between" style="margin-bottom:12px"><div class="steps">${s.turns.map((_,i)=>`<i class="${i<room.turn?'d':i===room.turn?'n':''}"></i>`).join('')}</div><span id="subst">${subStatus()}</span></div>
-    <div class="card evscene">${eventScene(turn.art, turn.war)}<div><div class="yr">${turn.year}년 · 사건 ${room.turn+1}/${s.turns.length}</div><h2>${esc(turn.title)}</h2><p>${esc(turn.text)}</p>${turn.war?'<p style="margin-top:8px"><span class="pill bad">전쟁 · 쌓아 둔 국방력이 피해를 좌우합니다</span></p>':''}</div></div>`;
-  if(m.submitted && !editing){
-    const sub=room.mySub, ch=sub&&turn.choices.find(c=>c.id===sub.choice);
-    $app.innerHTML=`${head}<div class="play" style="margin-top:16px"><div class="stack">
+  const t=me(), turn=curTurn(room);
+  if(room.mySub && !editing){
+    const s=room.mySub;
+    $app.innerHTML=`${headHTML()}<div class="play" style="margin-top:16px"><div class="stack">
       <div class="card stack" style="text-align:center; align-items:center"><span class="stamp pop" style="position:static; transform:rotate(-6deg); font-size:26px; padding:6px 18px">裁可</span>
-        <h2 style="font-size:22px">어명을 올렸습니다</h2>
-        ${ch?`<p style="margin:0">선택: <b>${esc(ch.label)}</b> · 세금 ${TAX_TXT[sub.gov.tax]}${sub.card&&cardById(sub.card)?' · 現代 카드 <b>'+esc(cardById(sub.card).name)+'</b>':''}</p><p class="small muted" style="margin:0; max-width:60ch">${esc(sub.why)}</p>`:''}
-        <p class="small muted" style="margin:0">선생님이 결과를 공개할 때까지 고칠 수 있습니다.</p>
-        <button class="btn" data-act="edit">어명 고치기</button></div>
-      ${room.myAdvice?speechHTML(room.myAdvice):''}
-      <div class="card"><h3 style="font-size:17px; margin-bottom:10px">다른 나라 현황</h3><div id="live">${othersHTML()}</div></div></div>
-      <div class="side"><div class="card">${gaugesHTML(m.st)}</div></div></div>`;
+        <h2 style="font-size:22px">합의안을 상신했습니다</h2>
+        <div class="chips" style="justify-content:center">${s.adopt.map(a=>`<span class="cchip">${esc(policyOf(turn,a.id).name)}</span>`).join('')}</div>
+        <p class="small muted" style="margin:0; max-width:60ch">${esc(s.why)}</p><p class="small muted" style="margin:0">상신: ${esc(s.by)} · 선생님이 결과를 공개할 때까지 고칠 수 있습니다.</p>
+        ${uCanDecide()?'<button class="btn" data-act="edit">합의안 고치기</button>':''}</div>
+      <div class="card stack"><h3 style="font-size:17px">우리 의정부의 제안</h3><div id="plist">${propListHTML()}</div></div>
+      <div class="card"><h3 style="font-size:17px; margin-bottom:10px">다른 의정부</h3><div id="live">${othersHTML()}</div></div></div>
+      <div class="side"><div class="card">${kingdomSVG(t.st)}<div style="margin-top:10px">${gaugesHTML(t.st)}</div></div><div class="card"><h3 style="font-size:16px;margin-bottom:8px">우리 의정부</h3><div id="mem">${membersHTML()}</div></div></div></div>`;
     return;
   }
-  $app.innerHTML=`${head}
-  <div class="choices" style="margin-top:14px">${turn.choices.map((c,i)=>`<button type="button" class="ch" data-pick="${c.id}" aria-pressed="${d.pick===c.id}"><span class="lt">${'甲乙丙'[i]}</span><b>${esc(c.label)}</b><span>${esc(c.desc)}</span><div class="tags">${tagsOf(c.eff)}</div></button>`).join('')}</div>
-  <p class="hint">▲▼는 즉각적인 효과의 방향만 보여 줍니다. 크기와 몇 해 뒤의 효과는 숨겨져 있습니다.</p>
-  ${room.myAdvice?`<div style="margin-bottom:14px">${speechHTML(room.myAdvice)}</div>`:''}
-  ${room.cardsOn?deckHTML(m,d):''}
-  <div class="play"><div class="stack">
-    <form class="card stack" id="act" novalidate>
-      <label class="f" for="why">결정 근거 <span class="hint">왜 이 대책을 골랐는지, 무엇을 감수하는지 모둠 의견을 쓰세요. (${MIN_WHY}자 이상)</span><textarea id="why">${esc(d.why)}</textarea><span class="hint" id="cnt">${d.why.trim().length}자</span></label>
-      <div class="err" id="err"></div>
-      <button class="btn primary big" type="submit">어명을 올린다</button></form>
-    <div class="card"><h3 style="font-size:17px; margin-bottom:10px">다른 나라 현황</h3><div id="live">${othersHTML()}</div></div></div>
+  const d=draft();
+  $app.innerHTML=`${headHTML()}
+  <div class="card stack" style="margin-top:14px"><div class="row between"><h3 style="font-size:19px">6조의 정책</h3><span class="small muted">정책을 누르면 자세히 보고 제안할 수 있습니다 · ▲▼는 즉시 효과의 방향만 보여 줍니다</span></div>
+    <div id="pols">${polsHTML()}</div></div>
+  <div class="play" style="margin-top:14px"><div class="stack">
+    <div class="card stack"><h3 style="font-size:17px">우리 의정부의 제안</h3><div id="plist">${propListHTML()}</div></div>
+    ${uCanDecide()?`<form class="card stack yeong" id="act" novalidate><h3 style="font-size:19px"><i class="r-yeong rico">領</i> 영의정의 합의안</h3>
+      <div id="pack">${packHTML()}</div>
+      <label class="f" for="why">합의안 근거 <span class="hint">이 정책들을 왜 함께 시행하는지, 무엇을 얻고 무엇을 감수하는지 (${MIN_WHY}자 이상)</span><textarea id="why" maxlength="400">${esc(d.why)}</textarea><span class="hint" id="cnt">${d.why.trim().length}자</span></label>
+      <div class="err" id="err"></div><button class="btn primary big" type="submit">합의안 상신</button></form>`
+      :`<div class="card stack"><h3 style="font-size:17px">영의정의 합의안</h3><div id="pack">${packHTML()}</div></div>`}
+    <div class="card"><h3 style="font-size:17px; margin-bottom:10px">다른 의정부</h3><div id="live">${othersHTML()}</div></div></div>
   <div class="side">
-    <div class="card"><h3 style="font-size:16px; margin-bottom:8px">우리 나라</h3>${kingdomSVG(m.st)}<div style="margin-top:10px" id="gg">${gaugesHTML(m.st, govEffect(d,m.st))}</div>
-      <p class="hint" style="margin:8px 0 0">빗금은 세금·예산으로 이번 해에 변할 양입니다.</p></div>
-    ${advisorsHTML(m)}
-    <div class="card stack"><h3 style="font-size:16px">국정 운영</h3>
-      <div class="sl"><div class="h"><b><label for="tax">세금</label></b><span id="tx">${TAX_TXT[d.tax]}</span></div><input type="range" id="tax" min="1" max="5" step="1" value="${d.tax}"><div class="ticks"><span>가볍게(민심▲)</span><span>무겁게(국고▲)</span></div></div>
-      <div class="sl"><div class="h"><b>예산 배분</b></div><div class="budget" id="bb"></div></div>
-      ${['df','lv','cu'].map(k=>`<div class="sl"><div class="h"><label for="b-${k}">${STATS[k].name}</label><span id="bp-${k}"></span></div><input type="range" id="b-${k}" data-bud="${k}" min="0" max="100" step="5" value="${d.bud[k]}"></div>`).join('')}
-    </div></div></div>`;
-  updGov();
+    <div class="card"><h3 style="font-size:16px; margin-bottom:8px">우리 나라</h3>${kingdomSVG(t.st)}<div style="margin-top:10px" id="gg">${gaugesHTML(t.st, uCanDecide()?packEffect(turn,d.adopt):null)}</div>
+      ${uCanDecide()?'<p class="hint" style="margin:8px 0 0">빗금과 ▲▼는 합의안의 즉시 효과 방향입니다(크기·조합 효과·지연 효과는 숨김).</p>':''}</div>
+    <div class="card"><h3 style="font-size:16px;margin-bottom:8px">우리 의정부</h3><div id="mem">${membersHTML()}</div></div></div></div>`;
 }
-function deckHTML(m,d){
-  const used=m.cards||[], left=CARD_LIMIT-used.length;
-  return `<div class="card stack" style="margin-bottom:14px"><div class="row between"><div><h3 style="font-size:18px">현대 제도 카드 <span class="small muted" style="font-family:var(--body)">선택 사항 · 사건마다 1장</span></h3>
-    <p class="small muted" style="margin:2px 0 0">오늘날의 경제·정치·법 제도를 조선에 맞게 바꾼 정책입니다. 사건의 대책과 함께 시행됩니다.</p></div><span class="pill ${left?'navy':'bad'}">남은 카드 ${left}/${CARD_LIMIT}</span></div>
-    <div id="cardsel">${cardSelHTML()}</div>
-    <div class="deck">${CARDS.map(cd=>cardHTML(cd,{sel:d.card===cd.id, used:used.includes(cd.id), dim:used.includes(cd.id)||(!left)})).join('')}</div></div>`;
-}
-function cardSelHTML(){ const cd=L.draft&&L.draft.card&&cardById(L.draft.card);
-  return cd?`<div class="cardnote">이번 사건에 쓸 카드: <b>${esc(cd.name)}</b> <span class="small muted">(${esc(cd.modern)})</span></div>`:'<p class="hint" style="margin:0">카드를 누르면 자세한 설명이 나오고, 그 안에서 쓸지 고를 수 있습니다.</p>';
-}
-function advisorsHTML(m){
-  const A=m.advisors||{have:[],used:[]}, used=A.used||[], heard=!!room.myAdvice;
-  return `<div class="card stack"><div class="row between"><h3 style="font-size:16px">히든 조언자</h3><span class="small muted">${A.have.length}/${ADVISORS.length}명</span></div>
-    <p class="hint" style="margin:0">초상화를 누르면 조언자 설명이 나옵니다. 한 사건에 한 명, 조언자마다 한 번만 부를 수 있습니다.</p>
-    <div class="advs">${ADVISORS.map(a=>{ const have=A.have.includes(a.id), u=used.includes(a.id), ready=have&&!u&&!heard;
-      return `<button type="button" class="adv ${u?'used':''} ${ready?'ready':''}" data-adv="${a.id}" title="${have?esc(a.name+' · '+a.title):esc(a.hint)}">${advisorSVG(a,!have)}<b>${have?esc(a.name):'???'}</b><span class="muted">${have?(u?'조언 마침':ready?'조언 청하기':'다음 사건에'):'잠김'}</span></button>`; }).join('')}</div>
-    <div class="small muted" id="advhint"></div></div>`;
-}
-function speechHTML(ad){
-  const a=advisorById(ad.id);
-  return `<div class="speech pop"><div class="who">${advisorSVG(a,false)}<b>${esc(a.name)}</b><span>${esc(a.title)}</span></div>
-    <div><p class="hello">“${esc(ad.hello)}”</p><ul>${ad.lines.map(l=>`<li><b>${l.mark} ${esc(l.label)}</b> · ${esc(l.text)}</li>`).join('')}</ul><p class="rec">${esc(ad.rec)}</p></div></div>`;
-}
-function updGov(){
-  const d=L.draft, m=me(), b=d.bud, tot=(b.df+b.lv+b.cu)||1;
-  const tx=document.getElementById('tx'); if(tx) tx.textContent=TAX_TXT[d.tax];
-  ['df','lv','cu'].forEach(k=>{ const e=document.getElementById('bp-'+k); if(e) e.textContent=Math.round(b[k]/tot*100)+'%'; });
-  const bb=document.getElementById('bb'); if(bb) bb.innerHTML=['df','lv','cu'].map(k=>`<i style="width:${b[k]/tot*100}%;background:${BUD_COLORS[k]}"></i>`).join('');
-  const gg=document.getElementById('gg'); if(gg) gg.innerHTML=gaugesHTML(m.st, govEffect(d,m.st));
+function updPreview(){ const gg=document.getElementById('gg'); if(gg&&uCanDecide()&&L.draft) gg.innerHTML=gaugesHTML(me().st, packEffect(curTurn(room),L.draft.adopt)); }
+function polModal(pid){
+  const turn=curTurn(room), p=policyOf(turn,pid), d=deptOf(pid), pr=props()[pid], m=mine();
+  const mineProp=pr&&pr.by===m.id, can=uCanPropose(pid)&&(!pr||mineProp)&&!room.mySub, dec=uCanDecide()&&!room.mySub;
+  let body='', foot='';
+  if(pr && !mineProp) body=`<div class="sec2"><h4>${esc(pr.name)} 학생(${esc(pr.role)})의 제안</h4><p>${esc(pr.why)}</p><p><b>비슷한 현대 정책</b> ${esc(pr.modern)}</p></div>`;
+  if(can){
+    body+=`<form class="stack" id="pform" novalidate style="gap:10px">
+      <label class="f" for="pwhy">제안 근거 <span class="hint">이 사건에 왜 이 정책이 필요한지, 부작용은 무엇인지 (${MIN_PWHY}자 이상)</span><textarea id="pwhy" maxlength="250" style="min-height:90px">${esc(pr?pr.why:(L.pd&&L.pd[pid]&&L.pd[pid].why)||'')}</textarea></label>
+      <label class="f" for="pmod">비슷한 현대 정책 <span class="hint">오늘날의 어떤 정책·제도와 닮았나요? 통합사회에서 배운 개념을 떠올려 보세요</span><input type="text" id="pmod" maxlength="80" value="${esc(pr?pr.modern:(L.pd&&L.pd[pid]&&L.pd[pid].modern)||'')}" placeholder="예: 누진세, 규제 완화, 국민 청원"></label>
+      <div class="err" id="perr"></div></form>`;
+    foot=(mineProp?'<button class="btn" data-unprop="'+pid+'">제안 거두기</button>':'<button class="btn" data-close>닫기</button>')+`<button class="btn primary" data-prop="${pid}">${mineProp?'제안 고치기':'이 정책 제안하기'}</button>`;
+  } else {
+    if(!pr) body+=`<p class="note" style="margin:0">${room.mySub?'합의안이 이미 상신되었습니다.':esc(josa(d.name,'이가'))+' 제안할 수 있는 정책입니다.'+(uHasRole(me(),d.id)?'':' 판서가 없으면 영의정이 대신 제안합니다.')}</p>`;
+    foot='<button class="btn" data-close>닫기</button>';
+  }
+  if(dec && pr){ const inP=L.draft.adopt.includes(pid); foot=(pr&&!mineProp?`<button class="btn" data-unprop="${pid}" style="margin-right:auto">제안 돌려보내기</button>`:'')+foot.replace('<button class="btn" data-close>닫기</button>','')+`<button class="btn ${inP?'':'jade'}" data-adopt="${pid}">${inP?'합의안에서 빼기':'합의안에 넣기'}</button>`; }
+  openModal(`<div class="mh"><div><small><i class="dico r-${d.id}">${d.icon}</i> ${esc(d.dept)} 정책</small><h2>${esc(p.name)}</h2></div><button class="x" data-close aria-label="닫기">✕</button></div>
+    <div class="mbody"><div class="sec2"><h4>어떤 정책인가요</h4><p>${esc(p.desc)}</p></div>
+      <div class="sec2"><h4>예상되는 즉시 효과</h4><div class="tags">${effList(p.eff)}${p.later?'<span class="tag">몇 해 뒤 추가 효과 있음</span>':''}</div><p class="hint" style="margin-top:4px">방향만 공개됩니다. 다른 정책과 함께 시행하면 효과가 커지거나 부딪힐 수 있습니다.</p></div>
+      ${body}</div><div class="mf">${foot}</div>`);
 }
 
 /* ---------- 결과 공개 ---------- */
 function vReveal(){
-  const s=myScen(), m=me(), turn=s.turns[room.turn], l=m.log.find(x=>x.t===room.turn);
-  const prev=prevStats(m), r=rankOf(room,m.id);
-  const notes = l ? l.notes.map((n,i)=>`<div class="note ${n.type}" data-at="${3000+i*350}">${n.type==='later'?'뒤늦게 나타난 효과: ':''}${esc(n.text)}</div>`).join('') : '';
-  const cd = l&&l.card&&cardById(l.card);
-  let at=3400+(l?l.notes.length:0)*350;
-  const extras = l ? [
-    cd?`<div class="cardnote" data-at="${at}"><b>현대의 ${esc(cd.modern)}</b> → 조선의 「${esc(cd.name)}」 · ${esc(cd.concept)}</div>`:'',
-    ...(l.unlocks||[]).map((id,k)=>{ const a=advisorById(id); return `<div class="unlock" data-at="${at+400+k*500}" data-fx="confetti"><div class="p">${advisorSVG(a,false)}</div><div><div class="eyebrow" style="color:#f3d9a0">히든 조언자 해금</div><h3>${esc(a.name)} · ${esc(a.title)}</h3><p style="margin:4px 0 0">“${esc(a.hello)}”</p></div></div>`; }),
-    l.ach?`<div><span class="ach" data-at="${at+300}" data-fx="confetti">業 업적 달성 · ${esc(l.ach)}</span></div>`:''
-  ].join('') : '';
-  const tDist=at+1200, tReal=tDist+1500, tRank=tReal+1400;
+  const t=me(), turn=curTurn(room), l=t.log.find(x=>x.t===room.turn);
+  const prev=prevStats(t), r=rankOf(room,t.id);
+  const notes = l ? l.notes.map((n,i)=>`<div class="note ${n.type}" data-at="${3000+i*350}">${n.type==='later'?'뒤늦게 나타난 효과: ':n.type==='combo'?'정책 조합 효과: ':n.type==='clash'?'정책 충돌: ':''}${esc(n.text)}</div>`).join('') : '';
+  const at=3400+(l?l.notes.length:0)*350;
+  const mods = l&&l.adopt.length ? `<div class="card stack"><h3 style="font-size:18px">우리가 시행한 정책과 현대 정책</h3><p class="small muted" style="margin:0">왼쪽은 우리 의정부가 쓴 비슷한 현대 정책, 오른쪽은 해설입니다. 같은 점과 다른 점을 찾아보세요.</p>
+    ${l.adopt.map((a,i)=>modernHTML(turn,a,{at:at+i*300})).join('')}</div>` : '';
+  const tDist=at+300*(l?l.adopt.length:0)+800, tReal=tDist+1500, tRank=tReal+1400;
+  const rec = l ? (l.adopt.length ? `${turn.year}년(${esc(turn.reign)}), 「${esc(turn.title)}」에 대하여 ${esc(t.name)} 의정부는 <b>${l.adopt.map(a=>esc(policyOf(turn,a.id).name)).join(', ')}</b>을(를) 함께 시행하였다.`
+    : `${turn.year}년, 「${esc(turn.title)}」에 대하여 ${esc(t.name)} 의정부는 끝내 <b>합의안을 올리지 못하였다</b>.`) : '';
   $app.innerHTML=`<div class="stack" id="rv"><button class="skip" data-act="skip">건너뛰기 ▶▶</button>
-    <div class="card stack"><div class="row between"><div class="eyebrow">${turn.year}년 실록</div><span class="pill navy" data-at="${tRank+600}">현재 ${r}위 · ${m.score}점</span></div>
-      ${l?`<div class="rec" data-at="0" data-fx="type">${!turn.choices.some(c=>c.id===l.choice)?`${turn.year}년, 「${esc(turn.title)}」에 대하여 조정은 끝내 <b>어명을 내리지 못하였다</b>. 세금은 ${TAX_TXT[l.tax]} 걷었다.`:`${turn.year}년, ${s.king}께서 「${esc(turn.title)}」에 대하여 <b>${esc(l.label)}</b>을(를) 명하시고${cd?`, 아울러 「${esc(cd.name)}」을(를) 시행하시고`:''}, 세금은 ${TAX_TXT[l.tax]} 걷게 하셨다.`}</div>
-      <div class="deltas">${SKEYS.map((k,i)=>`<div class="dl" data-at="${1700+i*160}" data-fx="count" data-to="${l.delta[k]}"><div class="k">${STATS[k].name}</div><div class="n z">±0</div><div class="small muted num">${Math.round(m.st[k])}</div></div>`).join('')}</div>
-      ${notes}${extras}`:'<p class="muted">이번 사건에는 참여하지 않았습니다.</p>'}
-    </div>
+    <div class="card stack"><div class="row between"><div class="eyebrow">${turn.year}년 실록</div><span class="pill navy" data-at="${tRank+600}">현재 ${r}위 · ${t.score}점</span></div>
+      ${l?`<div class="rec" data-at="0" data-fx="type">${rec}</div>
+      <div class="deltas">${SKEYS.map((k,i)=>`<div class="dl" data-at="${1700+i*160}" data-fx="count" data-to="${l.delta[k]}"><div class="k">${STATS[k].name}</div><div class="n z">±0</div><div class="small muted num">${Math.round(t.st[k])}</div></div>`).join('')}</div>
+      ${notes}`:'<p class="muted">이번 사건에는 참여하지 않았습니다.</p>'}</div>
     <div class="play"><div class="card stack"><h3 style="font-size:17px">우리 나라의 변화</h3>
-        <div class="kgrid"><div class="kswap" data-at="2300" data-fx="swap"><div class="k-old">${kingdomSVG(prev)}</div><div class="k-new">${kingdomSVG(m.st)}</div></div>
-        <div data-at="2300" data-fx="bars">${gaugesFromTo(prev, m.st)}</div></div></div>
-      <div class="side"><div class="card"><h3 style="font-size:16px; margin-bottom:10px">순위</h3><div data-at="${tRank}" data-fx="rank" id="lbanim">${lbAnimHTML(room,m.id,room.turn)}</div></div></div></div>
-    <div class="card stack"><h3 style="font-size:18px">${room.sid?'모둠들의 선택':esc(s.king)+' 시대를 고른 모둠들의 선택'}</h3>
-      <div data-at="${tDist}" data-fx="chips">${distAnimHTML(room, room.turn, m.id, m.sid)}</div>
-      ${realFlipHTML(turn, l&&l.real, tReal, false)}</div>
+        <div class="kgrid"><div class="kswap" data-at="2300" data-fx="swap"><div class="k-old">${kingdomSVG(prev)}</div><div class="k-new">${kingdomSVG(t.st)}</div></div>
+        <div data-at="2300" data-fx="bars">${gaugesFromTo(prev, t.st)}</div></div></div>
+      <div class="side"><div class="card"><h3 style="font-size:16px; margin-bottom:10px">순위</h3><div data-at="${tRank}" data-fx="rank">${lbAnimHTML(room,t.id,room.turn)}</div></div></div></div>
+    ${mods}
+    <div class="card stack"><h3 style="font-size:18px">의정부들의 선택과 실제 역사</h3>
+      <div data-at="${tDist}" data-fx="chips">${distAnimHTML(room, room.turn, t.id)}</div>
+      ${realFlipHTML(turn, l?l.matches:0, tReal, false)}</div>
     <div class="card"><h3 style="font-size:17px; margin-bottom:10px">각 나라의 모습</h3><div id="live">${othersHTML()}</div>
-      <p class="small muted" style="margin:10px 0 0">${room.turn+1>=s.turns.length?'선생님이 최종 결과를 열면 치세가 마무리됩니다.':'선생님이 다음 사건을 열 때까지 결과를 함께 살펴보세요.'}</p></div></div>`;
+      <p class="small muted" style="margin:10px 0 0">${room.turn+1>=ERA.turns.length?'선생님이 최종 결과를 열면 회의가 마무리됩니다.':'선생님이 다음 사건을 열 때까지 결과를 함께 살펴보세요.'}</p></div></div>`;
   runStages(document.getElementById('rv'));
 }
 
 /* ---------- 최종 ---------- */
 function reportText(){
-  const s=myScen(), m=me(), Lr=[];
-  Lr.push('[조선 국정 회의 보고서]'); Lr.push('방: '+room.code+' / 모둠: '+m.name+' / 모둠원: '+m.members);
-  Lr.push('시대: '+s.king+' ('+s.reign+') '+s.title); Lr.push('점수: '+m.score+'점 ('+rankOf(room,m.id)+'위/'+room.teams.length+'모둠) / 실제 역사와 일치: '+m.matches+'/'+m.log.length);
-  Lr.push('최종 지표: '+SKEYS.map(k=>STATS[k].name+' '+Math.round(m.st[k])).join(', '));
-  Lr.push('현대 제도 카드: '+((m.cards||[]).map(id=>{ const cd=cardById(id); return cd?cd.name+'('+cd.modern+')':''; }).join(', ')||'없음'));
-  Lr.push('업적: '+(m.ach.join(', ')||'없음')+' / 위기: '+(m.crises.map(c=>c.year+' '+c.name).join(', ')||'없음'));
-  if(m.ending) Lr.push('결말: '+m.ending.title+' - '+m.ending.text);
-  Lr.push(''); Lr.push('■ 국정 방향'); Lr.push(m.goal||'(작성하지 않음)'); Lr.push(''); Lr.push('■ 사건별 결정');
-  m.log.forEach(l=>{ const t=s.turns[l.t], rc=t.choices.find(c=>c.id===t.real.pick);
-    Lr.push(l.year+'년 '+t.title+' | 선택: '+l.label+(l.card&&cardById(l.card)?' + 카드: '+cardById(l.card).name:'')+' | 세금: '+TAX_TXT[l.tax]+' | 실제: '+rc.label); Lr.push('   근거: '+l.why); });
-  Lr.push(''); Lr.push('■ 성찰'); Lr.push('1) '+(L.ref&&L.ref.a||'')); Lr.push('2) '+(L.ref&&L.ref.b||'')); Lr.push('3) '+(L.ref&&L.ref.c||''));
-  return Lr.join('\n');
+  const t=me(), m=mine(), R=[];
+  R.push('[조선 국정 회의 · 의정부 보고서]'); R.push('방: '+room.code+' / 의정부: '+t.name+' / 이름: '+m.name+' ('+m.roles.map(x=>roleById(x).name).join('·')+')');
+  R.push('점수: '+t.score+'점 ('+rankOf(room,t.id)+'위/'+room.teams.length+') / 실제 역사와 같은 정책: '+t.matches+'개');
+  R.push('최종 지표: '+SKEYS.map(k=>STATS[k].name+' '+Math.round(t.st[k])).join(', '));
+  R.push(''); R.push('■ 사건별 시행 정책');
+  t.log.forEach(l=>{ const turn=ERA.turns[l.t]; R.push(l.year+'년 '+turn.title+' | 우리: '+(l.adopt.map(a=>policyOf(turn,a.id).name).join(', ')||'없음')+' | 실제: '+turn.real.ids.map(id=>policyOf(turn,id).name).join(', '));
+    l.adopt.forEach(a=>R.push('   · '+policyOf(turn,a.id).name+' ≒ (우리) '+a.modern+' / (해설) '+policyOf(turn,a.id).modern.name)); });
+  R.push(''); R.push('■ 성찰'); R.push('1) '+(L.ref&&L.ref.a||'')); R.push('2) '+(L.ref&&L.ref.b||'')); R.push('3) '+(L.ref&&L.ref.c||''));
+  return R.join('\n');
 }
 function vEnd(){
-  const s=myScen(), m=me(), r=rankOf(room,m.id); L.ref=L.ref||{a:'',b:'',c:''};
-  const cmp=m.log.map(l=>{ const t=s.turns[l.t], rc=t.choices.find(c=>c.id===t.real.pick); return `<tr><td class="num">${l.year}</td><td>${esc(t.title)}</td><td><b>${esc(l.label)}</b></td><td>${esc(rc.label)}</td><td>${l.real?'<span class="pill good">같음</span>':'<span class="pill">다름</span>'}</td></tr>`; }).join('');
+  const t=me(), m=mine(), r=rankOf(room,t.id); L.ref=L.ref||{a:'',b:'',c:''};
+  const cmp=t.log.map(l=>{ const turn=ERA.turns[l.t]; return `<tr><td class="num">${l.year}</td><td>${esc(turn.title)}</td><td>${l.adopt.map(a=>`<span class="${turn.real.ids.includes(a.id)?'hit':''}">${esc(policyOf(turn,a.id).name)}</span>`).join(', ')||'<span class="muted">없음</span>'}</td><td>${turn.real.ids.map(id=>esc(policyOf(turn,id).name)).join(', ')}</td><td class="num">${l.matches}</td></tr>`; }).join('');
+  const mods=t.log.flatMap(l=>l.adopt.filter(a=>a.by===m.name).map(a=>{ const turn=ERA.turns[l.t], p=policyOf(turn,a.id); return `<tr><td>${esc(p.name)}</td><td>${esc(a.modern)}</td><td>${esc(p.modern.name)}</td></tr>`; })).join('');
   $app.innerHTML=`<div class="stack">
-    <div class="banner">${bannerSVG(150)}<div class="over"><div class="eyebrow" style="color:#f3d9a0">${s.king} 치세 종료</div><h1>${esc(m.name)} 모둠 · ${r}위 · ${m.score}점</h1></div></div>
+    <div class="banner">${bannerSVG(150)}<div class="over"><div class="eyebrow" style="color:#f3d9a0">${ERA.period} 회의 종료</div><h1>${esc(t.name)} 의정부 · ${r}위 · ${t.score}점</h1></div></div>
     <div class="play"><div class="stack">
-      <div class="card stack">${m.ending?`<div class="note ${m.ending.bonus<0?'crisis':''}"><b>${esc(m.ending.title)}</b> · ${esc(m.ending.text)}</div>`:''}
-        ${m.lateNotes.length?`<div class="note">후대에 나타난 효과: ${m.lateNotes.map(esc).join(' ')}</div>`:''}
-        <div class="mykd">${kingdomSVG(m.st)}</div>
-        <div class="row"><b>업적</b> ${m.ach.length?m.ach.map(a=>`<span class="ach" style="font-size:14px;padding:3px 10px">${esc(a)}</span>`).join(''):'<span class="muted small">없음</span>'}</div>
-        ${(m.cards||[]).length?`<h3 style="font-size:16px">우리가 시행한 현대 제도</h3>${m.cards.map(id=>{ const cd=cardById(id); return cd?`<div class="cardnote"><b>${esc(cd.modern)}</b> → 「${esc(cd.name)}」 · ${esc(cd.concept)}</div>`:''; }).join('')}`:''}
-        <h3 style="font-size:16px">우리 선택과 실제 역사 (${m.matches}/${m.log.length} 일치)</h3>
-        <div class="tw"><table class="t"><thead><tr><th>연도</th><th>사건</th><th>우리 모둠</th><th>실제 왕</th><th></th></tr></thead><tbody>${cmp}</tbody></table></div></div>
-      ${m.final?`<div class="card stack"><h3 style="font-size:18px">제출 완료</h3><p class="small muted" style="margin:0">성찰이 선생님께 제출되었습니다. 보고서를 복사해 둘 수도 있습니다.</p>
+      <div class="card stack">${t.lateNotes.length?`<div class="note">후대에 나타난 효과: ${t.lateNotes.map(esc).join(' ')}</div>`:''}
+        <div class="mykd">${kingdomSVG(t.st)}</div>
+        <h3 style="font-size:16px">우리 의정부의 정책과 실제 역사 (같은 정책 ${t.matches}개)</h3>
+        <div class="tw"><table class="t"><thead><tr><th>연도</th><th>사건</th><th>우리 의정부</th><th>실제 역사</th><th>일치</th></tr></thead><tbody>${cmp}</tbody></table></div>
+        ${mods?`<h3 style="font-size:16px">내가 제안해 시행된 정책과 현대 정책</h3><div class="tw"><table class="t"><thead><tr><th>조선의 정책</th><th>내가 쓴 현대 정책</th><th>해설</th></tr></thead><tbody>${mods}</tbody></table></div>`:''}</div>
+      ${m.final?`<div class="card stack"><h3 style="font-size:18px">제출 완료</h3><p class="small muted" style="margin:0">성찰이 선생님께 제출되었습니다.</p>
         <div class="row"><button class="btn" data-act="copy">보고서 텍스트 복사</button><span class="small" id="copied" role="status"></span></div><textarea class="copybox" id="copybox" readonly hidden>${esc(reportText())}</textarea></div>`
-      :`<form class="card stack" id="fin" novalidate><h3 style="font-size:18px">사관의 성찰</h3>
-        <label class="f" for="r1">실제 역사와 가장 다르게 선택한 사건은 무엇인가요? 우리 선택의 결과를 실제 역사와 비교해 보세요. <span class="hint">${MIN_REF}자 이상</span><textarea id="r1">${esc(L.ref.a)}</textarea></label>
-        <label class="f" for="r2">실제 왕의 선택 하나를 골라 당시 상황을 근거로 평가하거나, 우리가 쓴 현대 제도 카드가 조선에서 어떤 효과와 한계가 있었는지 설명해 보세요. <span class="hint">${MIN_REF}자 이상</span><textarea id="r2">${esc(L.ref.b)}</textarea></label>
-        <label class="f" for="r3">우리 모둠의 치세를 실록 한 문단으로 정리해 보세요. <span class="hint">${MIN_REF}자 이상</span><textarea id="r3">${esc(L.ref.c)}</textarea></label>
+      :`<form class="card stack" id="fin" novalidate><h3 style="font-size:18px">나의 성찰 <span class="small muted" style="font-family:var(--body)">각자 씁니다</span></h3>
+        <label class="f" for="r1">1. 내가 맡은 조(영의정은 의정부 전체)의 결정 가운데 가장 중요했던 것은 무엇인가요? 그 결과를 실제 역사와 비교해 보세요. <span class="hint">${MIN_REF}자 이상</span><textarea id="r1">${esc(L.ref.a)}</textarea></label>
+        <label class="f" for="r2">2. 우리가 시행한 조선의 정책 하나를 골라, 비슷한 현대 정책과 같은 점과 다른 점을 설명해 보세요. <span class="hint">${MIN_REF}자 이상</span><textarea id="r2">${esc(L.ref.b)}</textarea></label>
+        <label class="f" for="r3">3. 의정부 회의에서 의견이 갈렸던 순간은 언제였고, 어떻게 합의했나요? <span class="hint">${MIN_REF}자 이상</span><textarea id="r3">${esc(L.ref.c)}</textarea></label>
         <div class="err" id="err"></div><button class="btn primary big" type="submit">선생님께 제출하기</button></form>`}
     </div>
-    <div class="side"><div class="card">${gaugesHTML(m.st)}</div><div class="card"><h3 style="font-size:16px; margin-bottom:10px">최종 순위</h3><div id="lb">${leaderboardHTML(room,m.id)}</div></div></div></div>
+    <div class="side"><div class="card">${gaugesHTML(t.st)}</div><div class="card"><h3 style="font-size:16px; margin-bottom:10px">최종 순위</h3>${leaderboardHTML(room,t.id)}</div><div class="card"><h3 style="font-size:16px;margin-bottom:8px">우리 의정부</h3><div id="mem">${membersHTML()}</div></div></div></div>
     <div class="card"><h3 style="font-size:17px; margin-bottom:10px">각 나라의 최종 모습</h3><div id="live">${othersHTML()}</div></div></div>`;
 }
 
 /* ---------- 이벤트 ---------- */
+function rolesChecked(scope){ return Array.from((scope||document).querySelectorAll('input[data-role]:checked')).map(x=>x.value); }
 document.addEventListener('submit', e=>{
   e.preventDefault();
   const f=e.target, btn=f.querySelector('button[type=submit]');
   if(f.id==='join'){
-    const code=v('code').trim().toUpperCase(), team=v('team').trim(), members=v('members').trim(), kc=document.querySelector('input[name=king]:checked'), sid=kc?kc.value:'';
+    const code=v('code').trim().toUpperCase(), team=v('team').trim(), name=v('nm').trim(), roles=rolesChecked(f);
     if(code.length!==4) return fail('방 코드 네 글자를 입력하세요.');
-    if(!team) return fail('모둠 이름을 입력하세요.'); if(!members) return fail('모둠원을 입력하세요.');
+    if(!team) return fail('모둠 이름을 입력하세요.'); if(!name) return fail('번호와 이름을 입력하세요.');
+    if(!roles.length) return fail('맡을 역할을 하나 이상 고르세요.');
     btn.disabled=true;
-    API.post({action:'join', code, team, members, sid}).then(j=>{
+    API.post({action:'join', code, team, name, roles}).then(j=>{
       if(!j.ok){ btn.disabled=false; return fail(j.error); }
-      L={code, teamId:j.teamId, teamName:team, members, sid}; save(); ver=0; poll();
+      L={code, teamId:j.teamId, memberId:j.memberId, teamName:team, name, roles}; save(); ver=0; poll();
     }).catch(()=>{ btn.disabled=false; fail('서버에 연결하지 못했습니다. 인터넷 연결을 확인하세요.'); });
   }
   if(f.id==='act'){
-    const d=L.draft;
-    if(!d.pick) return fail('사건에 대한 대책을 하나 고르세요.');
-    if(d.why.trim().length<MIN_WHY) return fail('결정 근거를 '+MIN_WHY+'자 이상 쓰세요. 지금 '+d.why.trim().length+'자입니다.');
-    btn.disabled=true; btn.textContent='올리는 중…';
-    API.post({action:'submit', code:L.code, teamId:L.teamId, turn:room.turn, choice:d.pick, card:d.card||null, gov:{tax:d.tax, bud:d.bud}, why:d.why.trim()}).then(j=>{
-      if(!j.ok){ btn.disabled=false; btn.textContent='어명을 올린다'; return fail(j.error); }
+    const d=L.draft; d.why=v('why'); save();
+    if(!d.adopt.length) return fail('합의안에 넣을 정책을 하나 이상 고르세요.');
+    if(d.why.trim().length<MIN_WHY) return fail('합의안 근거를 '+MIN_WHY+'자 이상 쓰세요. 지금 '+d.why.trim().length+'자입니다.');
+    btn.disabled=true; btn.textContent='상신하는 중…';
+    API.post({action:'submit', code:L.code, teamId:L.teamId, memberId:L.memberId, turn:room.turn, adopt:d.adopt, why:d.why.trim()}).then(j=>{
+      if(!j.ok){ btn.disabled=false; btn.textContent='합의안 상신'; return fail(j.error); }
       editing=false; ver=0; poll();
-    }).catch(()=>{ btn.disabled=false; btn.textContent='어명을 올린다'; fail('전송하지 못했습니다. 다시 눌러 주세요.'); });
+    }).catch(()=>{ btn.disabled=false; btn.textContent='합의안 상신'; fail('전송하지 못했습니다. 다시 눌러 주세요.'); });
   }
   if(f.id==='fin'){
     L.ref={a:v('r1'),b:v('r2'),c:v('r3')}; save();
     if([L.ref.a,L.ref.b,L.ref.c].some(x=>x.trim().length<MIN_REF)) return fail('세 질문에 각각 '+MIN_REF+'자 이상 답하세요.');
     btn.disabled=true;
-    API.post({action:'final', code:L.code, teamId:L.teamId, ref1:L.ref.a, ref2:L.ref.b, ref3:L.ref.c}).then(j=>{ if(!j.ok){ btn.disabled=false; return fail(j.error); } ver=0; poll(); })
+    API.post({action:'final', code:L.code, teamId:L.teamId, memberId:L.memberId, ref1:L.ref.a, ref2:L.ref.b, ref3:L.ref.c}).then(j=>{ if(!j.ok){ btn.disabled=false; return fail(j.error); } ver=0; poll(); })
       .catch(()=>{ btn.disabled=false; fail('전송하지 못했습니다. 다시 눌러 주세요.'); });
   }
 });
+document.addEventListener('input', e=>{
+  if(e.target.id==='why' && L.draft){ L.draft.why=e.target.value; save(); const c=document.getElementById('cnt'); if(c) c.textContent=e.target.value.trim().length+'자'; }
+  if((e.target.id==='pwhy'||e.target.id==='pmod')){ const pid=document.querySelector('[data-prop]'); if(!pid) return; const k=pid.dataset.prop; L.pd=L.pd||{}; L.pd[k]={why:v('pwhy'), modern:v('pmod')}; save(); }
+});
+function after(j, errId){ if(!j.ok){ fail(j.error, errId); return false; } ver=0; poll(); return true; }
 document.addEventListener('click', e=>{
-  const t=e.target.closest('[data-pick],[data-act],[data-card],[data-adv],[data-usecard],[data-advcall]'); if(!t||t.disabled) return;
-  if(t.dataset.adv){ const a=advisorById(t.dataset.adv), m=me(), A=m.advisors||{have:[],used:[]}, have=A.have.includes(a.id), used=A.used.includes(a.id);
-    const ready = have && !used && !room.myAdvice && room.phase==='deciding' && !m.submitted;
-    const foot = ready ? '<button class="btn" data-close>닫기</button><button class="btn primary" data-advcall="'+a.id+'">'+esc(a.name)+'에게 조언 청하기</button>'
-      : '<span class="small muted" style="margin-right:auto">'+(have&&!used&&room.myAdvice?'이번 사건에는 이미 조언을 들었습니다.':'')+'</span><button class="btn" data-close>닫기</button>';
-    openModal(advisorModalHTML(a, have, used, foot)); return; }
-  if(t.dataset.advcall){ const a=advisorById(t.dataset.advcall); t.disabled=true; t.textContent=josa(a.name,'을를')+' 부르는 중…';
-    API.post({action:'advise', code:L.code, teamId:L.teamId, advisor:a.id}).then(j=>{ closeModal(); if(!j.ok){ const h=document.getElementById('advhint'); if(h) h.textContent=j.error; return; } room.myAdvice=j.advice; ver=0; shown=''; render(); poll(); })
-      .catch(()=>{ t.disabled=false; t.textContent='다시 시도'; });
-    return; }
-  if(t.dataset.card){ const cd=cardById(t.dataset.card), m=me(), used=(m.cards||[]), d=L.draft;
-    const canUse = room.phase==='deciding' && !m.submitted && !used.includes(cd.id) && used.length<CARD_LIMIT;
-    const foot = d && d.card===cd.id ? '<button class="btn" data-usecard="">선택 취소</button><button class="btn primary" data-close>닫기</button>'
-      : canUse ? '<button class="btn" data-close>닫기</button><button class="btn primary" data-usecard="'+cd.id+'">이 카드 쓰기</button>'
-      : '<span class="small muted" style="margin-right:auto">'+(used.includes(cd.id)?'이미 쓴 카드입니다.':used.length>=CARD_LIMIT?'카드를 모두 썼습니다.':'')+'</span><button class="btn" data-close>닫기</button>';
-    openModal(cardModalHTML(cd, foot)); return; }
-  if(t.dataset.usecard!=null){ L.draft.card=t.dataset.usecard||null; save(); closeModal(); document.querySelectorAll('.pcard').forEach(b=>b.setAttribute('aria-pressed', b.dataset.card===L.draft.card)); const s=document.getElementById('cardsel'); if(s) s.innerHTML=cardSelHTML(); return; }
-  if(t.dataset.pick){ L.draft.pick=t.dataset.pick; save(); document.querySelectorAll('.ch').forEach(b=>b.setAttribute('aria-pressed', b.dataset.pick===L.draft.pick)); return; }
+  const t=e.target.closest('[data-pol],[data-act],[data-prop],[data-unprop],[data-adopt],[data-unadopt]'); if(!t||t.disabled) return;
+  if(t.dataset.pol){ polModal(t.dataset.pol); return; }
+  if(t.dataset.prop){ const pid=t.dataset.prop, why=v('pwhy').trim(), modern=v('pmod').trim();
+    if(why.length<MIN_PWHY) return fail('제안 근거를 '+MIN_PWHY+'자 이상 쓰세요.','perr');
+    if(modern.length<2) return fail('비슷한 현대 정책을 쓰세요.','perr');
+    t.disabled=true; API.post({action:'propose', code:L.code, teamId:L.teamId, memberId:L.memberId, turn:room.turn, pid, why, modern})
+      .then(j=>{ t.disabled=false; if(after(j,'perr')){ if(L.pd) delete L.pd[pid]; save(); closeModal(); } }).catch(()=>{ t.disabled=false; fail('전송하지 못했습니다.','perr'); }); return; }
+  if(t.dataset.unprop){ const pid=t.dataset.unprop; t.disabled=true;
+    API.post({action:'unpropose', code:L.code, teamId:L.teamId, memberId:L.memberId, turn:room.turn, pid}).then(j=>{ if(after(j,'perr')){ if(L.draft) L.draft.adopt=L.draft.adopt.filter(x=>x!==pid); save(); closeModal(); } else t.disabled=false; }); return; }
+  if(t.dataset.adopt){ const pid=t.dataset.adopt, d=L.draft, i=d.adopt.indexOf(pid);
+    if(i>=0) d.adopt.splice(i,1); else { if(d.adopt.length>=MAX_ADOPT){ closeModal(); return fail('합의안에는 '+MAX_ADOPT+'개까지 넣을 수 있습니다. 먼저 하나를 빼세요.'); } d.adopt.push(pid); }
+    save(); closeModal(); liveUpdate(); return; }
+  if(t.dataset.unadopt){ L.draft.adopt=L.draft.adopt.filter(x=>x!==t.dataset.unadopt); save(); liveUpdate(); return; }
   const a=t.dataset.act;
   if(a==='skip'){ const rv=document.getElementById('rv'); if(rv) skipStages(rv); return; }
-  if(a==='edit'){ editing=true; const sub=room.mySub; if(sub){ draft(); Object.assign(L.draft,{pick:sub.choice, card:sub.card||null, tax:sub.gov.tax, bud:Object.assign({},sub.gov.bud), why:sub.why}); save(); } render(); return; }
-  if(a==='goal'){ const g=v('goal'); t.disabled=true; API.post({action:'goal', code:L.code, teamId:L.teamId, goal:g}).then(j=>{ t.disabled=false; document.getElementById('gs').textContent=j.ok?'저장됨':'저장 실패'; }).catch(()=>{ t.disabled=false; document.getElementById('gs').textContent='저장 실패'; }); return; }
+  if(a==='edit'){ t.disabled=true; API.post({action:'retract', code:L.code, teamId:L.teamId, memberId:L.memberId}).then(j=>{ if(j.ok){ const s=room.mySub; draft(); if(s){ L.draft.adopt=s.adopt.map(x=>x.id); L.draft.why=s.why; save(); } } after(j); }); return; }
+  if(a==='roles'){ const roles=rolesChecked(t.closest('.card')), rs=document.getElementById('rs'); t.disabled=true;
+    API.post({action:'roles', code:L.code, teamId:L.teamId, memberId:L.memberId, roles}).then(j=>{ t.disabled=false; rs.textContent=j.ok?'저장됨':j.error; if(j.ok){ L.roles=roles; save(); ver=0; poll(); } }).catch(()=>{ t.disabled=false; rs.textContent='저장 실패'; }); return; }
   if(a==='copy'){ const m=document.getElementById('copied'), fb=()=>{ const b=document.getElementById('copybox'); b.hidden=false; b.select(); m.textContent='상자 내용을 직접 복사하세요.'; };
-    try{ navigator.clipboard.writeText(reportText()).then(()=>{ m.textContent='복사했습니다.'; }, fb); }catch(_){ fb(); } }
-});
-document.addEventListener('change', e=>{
-  if(e.target.name==='king2'){ const ks=document.getElementById('ks'); ks.textContent='바꾸는 중…';
-    API.post({action:'scenario', code:L.code, teamId:L.teamId, sid:e.target.value}).then(j=>{ if(!j.ok){ ks.textContent=j.error; return; } L.sid=e.target.value; save(); shown=''; ver=0; poll(); }).catch(()=>{ ks.textContent='바꾸지 못했습니다.'; }); }
-});
-document.addEventListener('input', e=>{
-  const id=e.target.id;
-  if(id==='tax'){ L.draft.tax=+e.target.value; updGov(); save(); return; }
-  if(e.target.dataset.bud){ L.draft.bud[e.target.dataset.bud]=+e.target.value; updGov(); save(); return; }
-  if(id==='why'){ L.draft.why=e.target.value; document.getElementById('cnt').textContent=L.draft.why.trim().length+'자'; save(); return; }
-  if(id==='goal'){ L.goalDraft=e.target.value; save(); }
-  if(['r1','r2','r3'].includes(id)){ L.ref={a:v('r1'),b:v('r2'),c:v('r3')}; save(); }
+    try{ navigator.clipboard.writeText(reportText()).then(()=>{ m.textContent='복사했습니다.'; }, fb); }catch(err){ fb(); } return; }
 });
 render(); poll();
 </script>
