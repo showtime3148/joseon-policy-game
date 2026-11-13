@@ -11,3 +11,14 @@ cd "$(dirname "$0")"
   cat scenarios.js; echo; cat core.js; echo; cat server/server.gs.js
 } > apps-script/Code.gs
 echo built apps-script/Code.gs
+
+# api/_engine.js = 같은 서버 코드를 Vercel 함수에서 쓰도록 감싼 파일
+mkdir -p api
+{
+  echo "/* 자동 생성 파일(build.sh) — scenarios.js + core.js + server/server.gs.js */"
+  echo "module.exports = function (CacheService, LockService, SpreadsheetApp, ContentService) {"
+  cat scenarios.js; echo; cat core.js; echo; cat server/server.gs.js
+  echo "return { doGet: doGet, doPost: doPost, HEADS: { '기록': LOG_HEAD, '제안': PROP_HEAD, '제출': FINAL_HEAD } };"
+  echo "};"
+} > api/_engine.js
+echo built api/_engine.js

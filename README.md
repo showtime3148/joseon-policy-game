@@ -13,13 +13,18 @@
 - `index.html` 학생 화면 (학생마다 자기 기기)
 - `host.html` 교사 화면 (교실 프로젝터)
 
-## 서버(구글 Apps Script) 설정
+## 서버 설정 (기본: Vercel 서버 함수 + Upstash Redis)
+1. Vercel 프로젝트 → Storage → Create Database → **Upstash for Redis**(Free) → 프로젝트에 연결
+2. 연결하면 `KV_REST_API_URL`, `KV_REST_API_TOKEN` 환경 변수가 자동으로 들어가고, 다음 배포부터 `/api/game`이 서버로 동작
+- 방 상태는 7일, 기록은 30일 보관. 교사 화면의 **기록 내려받기(엑셀)**로 `기록`·`제안`·`제출` 시트를 받음
+- 주소 뒤에 `?demo=1`을 붙이면 서버 없이 한 브라우저 안에서 도는 체험 모드
+
+### (선택) 구글 Apps Script 서버
 1. 새 구글 시트 → [확장 프로그램] > [Apps Script]에 `apps-script/Code.gs` 전체를 붙여 넣고 저장
-2. [배포] > [새 배포] > 유형 **웹 앱**, 실행 **나**, 액세스 **모든 사용자** → 배포 → URL 복사
-3. `config.js`의 `SERVER_URL`에 URL을 넣고 푸시 → Vercel 자동 재배포
-- 시트 탭: `기록`, `제안`, `제출`, `_rooms`(방 상태 백업)
+2. [배포] > [새 배포] > 유형 **웹 앱**, 실행 **나**, 액세스 **모든 사용자** → URL을 `config.js`의 `SERVER_URL`에 넣기
+- 기록은 시트 탭 `기록`·`제안`·`제출`에 바로 쌓임
 
 ## 개발
 - 사건·정책 데이터: `scenarios.js` / 규칙: `core.js` / 서버: `server/server.gs.js`
-- `./build.sh` → `apps-script/Code.gs` 생성(시나리오+규칙+서버를 한 파일로)
+- `./build.sh` → `apps-script/Code.gs`와 `api/_engine.js` 생성(시나리오+규칙+서버를 한 파일로). `api/game.js`가 Vercel에서 이 엔진을 Redis 위에서 실행
 - `node server/mock.js 8787` → Apps Script 없이 로컬 테스트 (`http://localhost:8787/host.html?server=http://localhost:8787/exec`)

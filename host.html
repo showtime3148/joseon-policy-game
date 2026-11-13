@@ -58,7 +58,7 @@ function poll(){
   clearTimeout(timer);
   if(!H.code) return;
   API.state(H.code, ver).then(j=>{ setConn(true);
-    if(!j.ok){ if(/찾을 수 없/.test(j.error||'')){ H={}; save(); room=null; render(); } return; }
+    if(!j.ok){ if(/찾을 수 없/.test(j.error||'')){ H={past:H.past||[]}; save(); room=null; render(); } return; }
     if(j.same){ runBots(room); return; } room=j.room; ver=room.ver; render(); runBots(room);
   }).catch(()=>setConn(false)).finally(()=>{ timer=setTimeout(poll, 2000); });
 }
@@ -85,13 +85,14 @@ function alertBox(m){ const e=document.getElementById('hmsg'); if(e){ e.textCont
 function ctlHTML(){
   const n=room.teams.filter(t=>t.submitted).length, N=room.teams.length, P=room.teams.reduce((a,t)=>a+t.members.length,0);
   let left='', right='';
-  if(room.phase==='lobby'){ left=`<span class="pill navy">의정부 ${N} · 학생 ${P}</span>${DEMO?`<button class="btn" data-act="bots">체험용 가상 의정부 3개 추가</button><a class="btn jade" href="index.html?room=${room.code}" target="_blank" rel="noopener">학생 화면 열기(새 탭)</a>`:''}`; right=`<button class="btn primary big" data-cmd="open" ${N?'':'disabled'}>첫 사건 열기</button>`; }
+  if(room.phase==='lobby'){ left=`<span class="pill navy">의정부 ${N} · 학생 ${P}</span>${DEMO?`<button class="btn" data-act="bots">체험용 가상 의정부 3개 추가</button><a class="btn jade" href="index.html?room=${room.code}${DEMO?'&demo=1':''}" target="_blank" rel="noopener">학생 화면 열기(새 탭)</a>`:''}`; right=`<button class="btn primary big" data-cmd="open" ${N?'':'disabled'}>첫 사건 열기</button>`; }
   if(room.phase==='deciding'){ left=`<span class="timer" id="timer">00:00</span><span class="pill ${n===N?'good':'navy'}" style="font-size:15px">합의안 상신 ${n}/${N}</span>`;
     right=`<button class="btn primary big" data-cmd="reveal">${n<N?'결과 공개 ('+(N-n)+'곳 미상신)':'결과 공개'}</button>`; }
   if(room.phase==='revealed'){ const last=room.turn+1>=ERA.turns.length; left=`<span class="pill good" style="font-size:15px">사건 ${room.turn+1}/${ERA.turns.length} 결과</span>`;
     right=`<button class="btn primary big" data-cmd="open">${last?'최종 결과 보기':'다음 사건 열기'}</button>`; }
   if(room.phase==='ended'){ const f=room.teams.reduce((a,t)=>a+t.members.filter(m=>m.final).length,0); left=`<span class="pill navy" style="font-size:15px">성찰 제출 ${f}/${P}명</span>`; right=`<button class="btn" data-act="newroom">새 방 만들기</button>`; }
-  return `<div class="row">${left}<span class="small" id="hmsg" style="color:var(--bad)"></span></div><div class="row">${right}</div>`;
+  const ex = DEMO||room.phase==='lobby' ? '' : `<button class="btn" data-act="export">기록 내려받기(엑셀)</button>`;
+  return `<div class="row">${left}${ex}<span class="small" id="hmsg" style="color:var(--bad)"></span></div><div class="row">${right}</div>`;
 }
 function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const e=document.getElementById('timer'); if(!e||!room||!room.openedAt) return;
   const sec=Math.max(0,Math.floor((Date.now()-room.openedAt)/1000)); e.textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0'); }, 500); }
@@ -107,12 +108,15 @@ function vSetup(){
       <div class="row"><label class="f" for="cls" style="flex:0 1 200px">학급<input type="text" id="cls" placeholder="예: 1-1" autocomplete="off"></label>
         <button class="btn primary big" data-act="create" style="align-self:flex-end">방 만들기</button></div>
       <div class="err" id="err"></div></div>
+    ${!DEMO&&(H.past||[]).length?`<div class="card stack"><h3 style="font-size:18px">지난 방 기록 <span class="small muted" style="font-family:var(--body)">이 컴퓨터에서 만든 방 · 30일 동안 보관</span></h3>
+      <div class="tw"><table class="t"><thead><tr><th>방 코드</th><th>학급</th><th>만든 날</th><th></th></tr></thead><tbody>${H.past.map(p=>`<tr><td class="num"><b>${p.code}</b></td><td>${esc(p.cls||'')}</td><td class="num">${new Date(p.at).toLocaleString('ko-KR')}</td><td><button class="btn" data-act="export" data-code="${p.code}" data-key="${p.hostKey}">기록 내려받기(엑셀)</button></td></tr>`).join('')}</tbody></table></div>
+      <span class="small" id="hmsg" style="color:var(--bad)"></span></div>`:''}
     <details class="card"><summary style="cursor:pointer;font-weight:700">수업 진행 방법</summary><ol>
       <li>방을 만들면 네 글자 방 코드가 나옵니다. 교실 화면에 띄워 두세요.</li>
       <li>학생은 각자 기기로 <b>${esc(joinUrl())}</b> 에 들어가 방 코드, 모둠(의정부) 이름, 번호·이름을 쓰고 역할(영의정, 이·호·예·병·형·공조 판서)을 고릅니다. 모둠원이 적으면 한 사람이 두 조를 겸합니다.</li>
       <li><b>첫 사건 열기</b>를 누르면 모든 의정부에 같은 사건이 열립니다. 판서는 자기 조 정책을 근거와 <b>비슷한 현대 정책</b>을 적어 제안하고, 영의정이 최대 ${MAX_ADOPT}개를 묶어 합의안을 상신합니다.</li>
       <li><b>결과 공개</b>를 누르면 의정부별 시행 정책, 지표 변화, 현대 정책 해설이 공개됩니다. 토의한 뒤 <b>실제 역사 공개</b>를 누르세요.</li>
-      <li>7개 사건이 끝나면 학생마다 성찰을 제출합니다. 구글 시트의 <b>기록</b>(의정부별 합의안), <b>제안</b>(학생별 제안·현대 정책), <b>제출</b>(개인 성찰) 탭에 쌓입니다.</li></ol></details>
+      <li>7개 사건이 끝나면 학생마다 성찰을 제출합니다. <b>기록 내려받기(엑셀)</b>를 누르면 <b>기록</b>(의정부별 합의안), <b>제안</b>(학생별 제안·현대 정책), <b>제출</b>(개인 성찰) 시트가 담긴 파일을 받습니다. 기록은 30일 동안 보관되어 이 화면의 '지난 방 기록'에서 다시 받을 수 있습니다.</li></ol></details>
   </div>`;
 }
 
@@ -174,6 +178,21 @@ function vEnd(){
     <div class="card"><h3 style="font-size:20px; margin-bottom:10px">각 나라의 최종 모습</h3><div id="live">${gridHTML()}</div></div></div>`;
 }
 
+/* ---------- 기록 내려받기 ---------- */
+function loadXlsx(){ return window.XLSX ? Promise.resolve() : new Promise((ok,no)=>{ const s=document.createElement('script'); s.src='vendor/xlsx.min.js'; s.onload=ok; s.onerror=()=>no(new Error('엑셀 도구를 불러오지 못했습니다.')); document.head.appendChild(s); }); }
+function kst(v){ if(typeof v==='string' && /^\d{4}-\d\d-\d\dT/.test(v)) return new Date(v).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}); return v; }
+function exportXlsx(code, key, btn){
+  const old=btn.textContent; btn.disabled=true; btn.textContent='내려받는 중…';
+  const done=m=>{ btn.disabled=false; btn.textContent=old; if(m) alertBox(m); };
+  fetch(serverUrl()+'?action=export&code='+encodeURIComponent(code)+'&hostKey='+encodeURIComponent(key)+'&_='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(j=>{
+    if(!j.ok) return done(j.error);
+    return loadXlsx().then(()=>{ const wb=XLSX.utils.book_new();
+      Object.keys(j.sheets).forEach(n=>{ const ws=XLSX.utils.aoa_to_sheet(j.sheets[n].map(r=>r.map(kst))); ws['!cols']=j.sheets[n][0].map(()=>({wch:18})); XLSX.utils.book_append_sheet(wb, ws, n); });
+      const buf=XLSX.write(wb,{type:'array',bookType:'xlsx'}), url=URL.createObjectURL(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+      const a=document.createElement('a'); a.href=url; a.download='joseon_'+code+'_records.xlsx'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); done(); });
+  }).catch(e=>done(e.message||'내려받지 못했습니다.'));
+}
+
 /* ---------- 이벤트 ---------- */
 document.addEventListener('click', e=>{
   const t=e.target.closest('[data-act],[data-cmd]'); if(!t||t.disabled) return;
@@ -181,10 +200,11 @@ document.addEventListener('click', e=>{
   const a=t.dataset.act;
   if(a==='flipreal'){ const fc=t.closest('.flipcard'); FX.flip(fc, false); return; }
   if(a==='create'){ t.disabled=true;
-    API.post({action:'create', cls:document.getElementById('cls').value.trim()}).then(j=>{ if(!j.ok){ t.disabled=false; return fail(j.error); } H={code:j.code, hostKey:j.hostKey}; save(); ver=0; poll(); })
+    API.post({action:'create', cls:document.getElementById('cls').value.trim()}).then(j=>{ if(!j.ok){ t.disabled=false; return fail(j.error); } const past=(H.past||[]).filter(x=>x.code!==j.code); past.unshift({code:j.code, hostKey:j.hostKey, cls:document.getElementById('cls').value.trim(), at:Date.now()}); H={code:j.code, hostKey:j.hostKey, past:past.slice(0,20)}; save(); ver=0; poll(); })
       .catch(()=>{ t.disabled=false; fail('서버에 연결하지 못했습니다. config.js의 서버 주소를 확인하세요.'); }); }
   if(a==='bots'){ t.disabled=true; addBots(H.code).then(()=>{ ver=0; poll(); }); return; }
-  if(a==='newroom'){ H={}; save(); room=null; ver=0; render(); }
+  if(a==='newroom'){ H={past:H.past||[]}; save(); room=null; ver=0; render(); }
+  if(a==='export'){ exportXlsx(t.dataset.code||H.code, t.dataset.key||H.hostKey, t); return; }
 });
 render(); poll();
 </script>

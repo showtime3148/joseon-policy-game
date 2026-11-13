@@ -1,5 +1,5 @@
 /* 학생 화면·교사 화면 공통 */
-function serverUrl(){ try{ const o=new URLSearchParams(location.search).get('server'); if(o) return o; }catch(e){} return SERVER_URL; }
+function serverUrl(){ try{ const q=new URLSearchParams(location.search); if(q.get('demo')) return ''; const o=q.get('server'); if(o) return o; if(location.protocol==='file:') return ''; }catch(e){} return SERVER_URL; }
 const API = {
   state(code, ver, team){ return fetch(serverUrl()+'?action=state&code='+encodeURIComponent(code)+(ver?'&ver='+ver:'')+(team?'&team='+team:'')+'&_='+Date.now(), {cache:'no-store'}).then(r=>r.json()); },
   post(d){ return fetch(serverUrl(), {method:'POST', body:JSON.stringify(d)}).then(r=>r.json()); }
