@@ -622,7 +622,7 @@ function doPost(e) {
 
 function handle(d) {
   if (d.action === 'create') {
-    if (d.sid && !scen(d.sid)) return { ok: false, error: '시나리오가 없습니다.' };
+    if (!scen(d.sid)) return { ok: false, error: '다스릴 왕(시대)을 고르세요.' };
     let code; do { code = rid(4, CODE_CHARS); } while (CacheService.getScriptCache().get('room_' + code));
     const r = { code: code, hostKey: rid(16, CODE_CHARS), sid: d.sid || '', cls: String(d.cls || ''), cards: d.cards !== false, phase: 'lobby', turn: 0, teams: {}, order: [], created: Date.now() };
     putRoom(r, true);

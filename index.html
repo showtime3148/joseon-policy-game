@@ -86,7 +86,6 @@ function vJoin(){
       <h2 style="font-size:22px">어전 회의에 참가하기</h2>
       <label class="f" for="code">방 코드 <span class="hint">교실 화면에 보이는 네 글자</span><input type="text" id="code" value="${esc(L.code||q)}" maxlength="4" autocomplete="off" style="font-size:28px; letter-spacing:.3em; text-transform:uppercase; font-family:var(--display); font-weight:800"></label>
       <label class="f" for="team">모둠 이름<input type="text" id="team" value="${esc(L.teamName||'')}" maxlength="20" placeholder="예: 집현전" autocomplete="off"></label>
-      <div class="f"><b style="font-weight:500">우리 모둠이 다스릴 왕 <span class="hint">선생님이 시대를 정한 방이면 고르지 않아도 됩니다</span></b>${kingPicker(L.sid,'king')}</div>
       <label class="f" for="members">모둠원 <span class="hint">번호와 이름, 쉼표로 구분</span><input type="text" id="members" value="${esc(L.members||'')}" placeholder="예: 3 김민준, 7 이서연, 12 박지호" autocomplete="off"></label>
       <div class="err" id="err"></div>
       <button class="btn primary big" type="submit">입궐하기</button>
@@ -103,7 +102,6 @@ function vLobby(){
       <div class="card stack"><div class="row between"><h2 style="font-size:20px">즉위 당시 나라의 형편</h2><span class="pill navy">선생님이 첫 사건을 열 때까지 기다리세요</span></div>
         <p style="margin:0; font-size:16px; line-height:1.8">${esc(s.lead)}</p>
         <div class="mykd">${kingdomSVG(m.st)}</div></div>
-      ${!room.sid?`<div class="card stack"><h3 style="font-size:18px">다스릴 왕 바꾸기</h3><p class="small muted" style="margin:0">첫 사건이 열리기 전까지 바꿀 수 있습니다.</p>${kingPicker(m.sid,'king2')}<div class="small" id="ks"></div></div>`:''}
       <div class="card stack"><h3 style="font-size:18px">우리 모둠의 국정 방향</h3>
         <label class="f" for="goal">가장 시급한 문제는 무엇이며, 어떤 지표를 먼저 살릴 것인가요?<textarea id="goal">${esc(L.goalDraft!=null?L.goalDraft:m.goal)}</textarea></label>
         <div class="row"><button class="btn jade" data-act="goal">국정 방향 저장</button><span class="small" id="gs">${m.goal?'저장됨':''}</span></div></div>

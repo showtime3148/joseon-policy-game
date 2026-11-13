@@ -50,7 +50,7 @@ main{max-width:1500px}
 const KEY='joseon-host-v2';
 function alertBoxSafe(){}
 const $app=document.getElementById('app');
-let H=load(), room=null, ver=0, shown='', timer=null, tick=null, pick='free';
+let H=load(), room=null, ver=0, shown='', timer=null, tick=null, pick='sejong';
 function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(H)); }catch(e){} }
 function joinUrl(){ return location.origin + location.pathname.replace(/host\.html$/,''); }
@@ -107,7 +107,6 @@ function vSetup(){
     <div class="banner">${bannerSVG(200)}<div class="over"><h1>朝鮮 國政 會議</h1><p>교사 화면 · 방을 만들고 교실 화면에 띄우세요</p></div></div>
     ${DEMO?'<div class="note"><b>체험 모드</b> · 서버 없이 이 브라우저 안에서만 동작합니다. 방을 만든 뒤 <b>가상 모둠 추가</b>를 누르고, <b>모둠 화면 열기</b>로 새 탭에서 직접 한 모둠이 되어 보세요.</div>':''}
     <div class="card stack"><h2 style="font-size:22px">어느 왕의 시대로 들어갈까요?</h2>
-      <button type="button" class="king" data-sid="free" aria-pressed="${pick==='free'}" style="border-top-color:var(--jade)"><h3>모둠이 직접 선택</h3><p>모둠마다 다스릴 왕을 고릅니다. 사건은 모든 모둠이 함께 진행하고, 결과 공개 때 시대별로 비교합니다.</p></button>
       <div class="kings">${SCENARIOS.map(s=>`<button type="button" class="king" data-sid="${s.id}" aria-pressed="${pick===s.id}"><span class="small muted">재위 ${s.reign}</span><h3>${s.king}</h3><b style="font-size:14px">${esc(s.title)}</b><p>${esc(s.lead)}</p></button>`).join('')}</div>
       <div class="row"><label class="f" for="cls" style="flex:0 1 200px">학급<input type="text" id="cls" placeholder="예: 2-1" autocomplete="off"></label>
         <label class="row" style="align-self:flex-end; gap:6px; padding-bottom:10px"><input type="checkbox" id="cardson" checked> 현대 제도 카드 사용 <span class="hint">(통합사회 융합 · 모둠당 ${CARD_LIMIT}장)</span></label>
@@ -202,7 +201,7 @@ document.addEventListener('click', e=>{
   const a=t.dataset.act;
   if(a==='flipreal'){ const fc=t.closest('.flipcard'); FX.flip(fc, false); return; }
   if(a==='create'){ if(!pick) return fail('왕을 고르세요.'); t.disabled=true;
-    API.post({action:'create', sid:pick==='free'?'':pick, cards:document.getElementById('cardson').checked, cls:document.getElementById('cls').value.trim()}).then(j=>{ if(!j.ok){ t.disabled=false; return fail(j.error); } H={code:j.code, hostKey:j.hostKey}; save(); ver=0; poll(); })
+    API.post({action:'create', sid:pick, cards:document.getElementById('cardson').checked, cls:document.getElementById('cls').value.trim()}).then(j=>{ if(!j.ok){ t.disabled=false; return fail(j.error); } H={code:j.code, hostKey:j.hostKey}; save(); ver=0; poll(); })
       .catch(()=>{ t.disabled=false; fail('서버에 연결하지 못했습니다. config.js의 서버 주소를 확인하세요.'); }); }
   if(a==='bots'){ t.disabled=true; addBots(H.code).then(()=>{ ver=0; poll(); }); return; }
   if(a==='newroom'){ H={}; save(); room=null; ver=0; render(); }
