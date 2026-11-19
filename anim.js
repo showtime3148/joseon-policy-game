@@ -112,7 +112,8 @@ function distAnimHTML(room, turnIdx, myId){
   const turn = ERA.turns[turnIdx], by = {}, none = [];
   turn.policies.forEach(p => by[p.id] = []);
   room.teams.forEach(t => { const l = t.log.find(x => x.t === turnIdx); if (!l) return; if (!l.adopt.length) none.push(t); l.adopt.forEach(a => by[a.id] && by[a.id].push(t)); });
-  return `<div class="dist pdist">${turn.policies.map(p => { const d = deptOf(p.id); return `<div class="dc" data-real="${turn.real.ids.includes(p.id) ? 1 : 0}"><div class="row between"><h4><i class="dico r-${d.id}">${d.icon}</i> ${esc(p.name)}</h4><span class="cnt num" data-to="${by[p.id].length}">0</span></div>
+  const shown = turn.policies.filter(p => by[p.id].length || turn.real.ids.includes(p.id));
+  return `<div class="dist pdist">${shown.map(p => { const d = deptOf(p.id); return `<div class="dc" data-real="${turn.real.ids.includes(p.id) ? 1 : 0}"><div class="row between"><h4><i class="dico r-${d.id}">${d.icon}</i> ${esc(p.name)}</h4><span class="cnt num" data-to="${by[p.id].length}">0</span></div>
     <div class="chips">${by[p.id].map(t => `<span class="chip ${t.id === myId ? 'me' : ''}">${esc(t.name)}</span>`).join('') || '<span class="small muted">없음</span>'}</div></div>`; }).join('')}</div>
     ${none.length ? `<p class="small muted" style="margin:6px 0 0">합의안을 올리지 못한 의정부: ${none.map(t => esc(t.name)).join(', ')}</p>` : ''}`;
 }

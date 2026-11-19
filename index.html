@@ -211,6 +211,21 @@ function vDecide(){
     <div class="card"><h3 style="font-size:16px;margin-bottom:8px">우리 의정부</h3><div id="mem">${membersHTML()}</div></div></div></div>`;
 }
 function updPreview(){ const gg=document.getElementById('gg'); if(gg&&uCanDecide()&&L.draft) gg.innerHTML=gaugesHTML(me().st, packEffect(curTurn(room),L.draft.adopt)); }
+function aiUrl(){ const su=serverUrl(); return /\/api\/game$/.test(su) ? su.replace(/game$/,'advice') : ''; }
+function aiHTML(t){ return t ? '<div class="aih">AI 조언</div>'+esc(t).replace(/\n/g,'<br>') : ''; }
+function askAI(btn){
+  const pid=btn.dataset.ai, box=document.getElementById('aiout'), url=aiUrl();
+  box.hidden=false;
+  if(!url){ box.innerHTML='<p class="small muted" style="margin:0">체험 모드나 구글 Apps Script 서버에서는 AI 조언을 쓸 수 없습니다.</p>'; return; }
+  btn.disabled=true; btn.textContent='🤖 생각하는 중…'; box.innerHTML='<p class="small muted" style="margin:0">AI가 근거를 읽고 있습니다…</p>';
+  fetch(url,{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({code:L.code, teamId:L.teamId, memberId:L.memberId, pid, why:v('pwhy'), modern:v('pmod')})})
+    .then(r=>r.json()).then(j=>{
+      btn.disabled=false; btn.textContent='🤖 AI 조언 다시 받기';
+      if(!j.ok){ box.innerHTML='<p class="err" style="margin:0">'+esc(j.error)+'</p>'; return; }
+      L.ai=L.ai||{}; L.ai[room.turn+':'+pid]=j.text; save();
+      box.innerHTML=aiHTML(j.text)+(j.left!=null?'<p class="hint" style="margin:6px 0 0">이번 사건에서 남은 AI 조언 '+j.left+'번</p>':'');
+    }).catch(()=>{ btn.disabled=false; btn.textContent='🤖 AI 조언 받기'; box.innerHTML='<p class="err" style="margin:0">AI에 연결하지 못했습니다. 다시 눌러 주세요.</p>'; });
+}
 function polModal(pid){
   const turn=curTurn(room), p=policyOf(turn,pid), d=deptOf(pid), pr=props()[pid], m=mine();
   const mineProp=pr&&pr.by===m.id, can=uCanPropose(pid)&&(!pr||mineProp)&&!room.mySub, dec=uCanDecide()&&!room.mySub;
@@ -219,6 +234,8 @@ function polModal(pid){
   if(can){
     body+=`<form class="stack" id="pform" novalidate style="gap:10px">
       <label class="f" for="pwhy">제안 근거 <span class="hint">이 사건에 왜 이 정책이 필요한지, 부작용은 무엇인지 (${MIN_PWHY}자 이상)</span><textarea id="pwhy" maxlength="250" style="min-height:90px">${esc(pr?pr.why:(L.pd&&L.pd[pid]&&L.pd[pid].why)||'')}</textarea></label>
+      <div class="aibar"><button type="button" class="btn ai" data-ai="${pid}">🤖 AI 조언 받기</button><span class="hint">근거를 먼저 써 본 뒤 누르면 더 알맞은 조언을 받아요. AI는 답을 대신 써 주지 않습니다.</span></div>
+      <div class="aiout" id="aiout" ${L.ai&&L.ai[room.turn+':'+pid]?'':'hidden'}>${aiHTML(L.ai&&L.ai[room.turn+':'+pid])}</div>
       <label class="f" for="pmod">비슷한 현대 정책 <span class="hint">오늘날의 어떤 정책·제도와 닮았나요? 통합사회에서 배운 개념을 떠올려 보세요</span><input type="text" id="pmod" maxlength="80" value="${esc(pr?pr.modern:(L.pd&&L.pd[pid]&&L.pd[pid].modern)||'')}" placeholder="예: 누진세, 규제 완화, 국민 청원"></label>
       <div class="err" id="perr"></div></form>`;
     foot=(mineProp?'<button class="btn" data-unprop="'+pid+'">제안 거두기</button>':'<button class="btn" data-close>닫기</button>')+`<button class="btn primary" data-prop="${pid}">${mineProp?'제안 고치기':'이 정책 제안하기'}</button>`;
@@ -339,7 +356,8 @@ document.addEventListener('input', e=>{
 });
 function after(j, errId){ if(!j.ok){ fail(j.error, errId); return false; } ver=0; poll(); return true; }
 document.addEventListener('click', e=>{
-  const t=e.target.closest('[data-pol],[data-act],[data-prop],[data-unprop],[data-adopt],[data-unadopt],[data-sresp]'); if(!t||t.disabled) return;
+  const t=e.target.closest('[data-ai],[data-pol],[data-act],[data-prop],[data-unprop],[data-adopt],[data-unadopt],[data-sresp]'); if(!t||t.disabled) return;
+  if(t.dataset.ai){ askAI(t); return; }
   if(t.dataset.pol){ polModal(t.dataset.pol); return; }
   if(t.dataset.sresp){ const ch=t.dataset.sresp; document.querySelectorAll('[data-sresp]').forEach(b=>b.disabled=true);
     API.post({action:'respond', code:L.code, teamId:L.teamId, memberId:L.memberId, choice:ch}).then(j=>{ if(!j.ok){ alert(j.error); document.querySelectorAll('[data-sresp]').forEach(b=>b.disabled=false); return; } room.mySresp=ch; closeModal(); ver=0; poll(); }); return; }

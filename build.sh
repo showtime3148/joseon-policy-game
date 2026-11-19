@@ -18,7 +18,7 @@ mkdir -p api
   echo "/* 자동 생성 파일(build.sh) — scenarios.js + core.js + server/server.gs.js */"
   echo "module.exports = function (CacheService, LockService, SpreadsheetApp, ContentService) {"
   cat scenarios.js; echo; cat core.js; echo; cat server/server.gs.js
-  echo "return { doGet: doGet, doPost: doPost, HEADS: { '기록': LOG_HEAD, '제안': PROP_HEAD, '제출': FINAL_HEAD } };"
+  echo "return { doGet: doGet, doPost: doPost, HEADS: { '기록': LOG_HEAD, '제안': PROP_HEAD, '제출': FINAL_HEAD }, ERA: ERA, STATS: STATS, ROLES: ROLES, MAX_ADOPT: MAX_ADOPT };"
   echo "};"
 } > api/_engine.js
 echo built api/_engine.js

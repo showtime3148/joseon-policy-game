@@ -398,3 +398,11 @@ button.sxopt{cursor:pointer} button.sxopt:hover{border-color:#8c2d1e}
 .ldn{display:flex; align-items:center; gap:4px; margin:3px 0} .ldn b{flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis} .ldn .num{font-family:var(--display); font-weight:800; font-size:18px}
 .ldg{font-size:11px} .ldg .up{color:var(--jade)}
 .lbr[style*="--nc"] .bb i{background:var(--nc)}
+
+/* AI 조언 */
+.aibar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:-2px}
+.aibar .hint{flex:1; min-width:180px}
+.btn.ai{background:#eef3fb; border-color:#9fb4d6; color:#22406e; font-weight:700}
+.btn.ai:hover{background:#e1eaf8}
+.aiout{background:#f3f7fd; border:1.5px solid #c7d6ee; border-radius:8px; padding:10px 12px; font-size:14px; line-height:1.7}
+.aiout .aih{font-size:12px; font-weight:700; color:#22406e; letter-spacing:.04em; margin-bottom:4px}
