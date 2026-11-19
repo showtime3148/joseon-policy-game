@@ -244,6 +244,57 @@ const ERA = {
   ]
 };
 
+/* 돌발 이벤트: 정책 협의 도중 갑자기 일어나는 일. 모든 나라에 같은 일이 일어나고, 각 나라가 대응을 고른다.
+ * ignore: 결과 공개 때까지 대응하지 않았을 때 */
+const SURPRISE_RATE = 0.7;   // 사건마다 돌발 이벤트가 일어날 확률
+const SURPRISES = [
+  {id:'drought', icon:'旱', title:'큰 가뭄', text:'석 달째 비가 내리지 않아 논바닥이 갈라졌습니다. 굶주린 백성들이 고을 관아 앞에 모여들고 있습니다.',
+   options:[{id:'a', label:'구휼미 방출', desc:'창고의 곡식을 풀어 굶주린 백성을 먹인다.', eff:{tr:-5, pp:4, lv:2}},
+            {id:'b', label:'세금 유예와 기우제', desc:'올해 세금 거두기를 미루고 비를 비는 제사를 지낸다.', eff:{tr:-2, cr:1, pp:1, lv:-2}}],
+   ignore:{eff:{lv:-5, pp:-4}, note:'가뭄을 내버려 두어 굶주린 백성이 고향을 떠났습니다.'}, modern:'재난 지원금·긴급 복지'},
+  {id:'plague', icon:'疫', title:'역병 유행', text:'남쪽 고을에서 시작된 돌림병이 도성 가까이 번지고 있습니다.',
+   options:[{id:'a', label:'의원 파견과 격리', desc:'혜민서 의원을 보내고 환자를 따로 돌본다.', eff:{tr:-4, pp:3, lv:1, cu:1}},
+            {id:'b', label:'도성 출입 통제', desc:'성문을 닫아 병이 들어오지 못하게 한다.', eff:{lv:-3, df:1, pp:-1}}],
+   ignore:{eff:{lv:-5, pp:-5}, note:'손을 쓰지 못해 역병이 크게 번졌습니다.'}, modern:'감염병 방역 정책·사회적 거리 두기'},
+  {id:'envoy', icon:'使', title:'청 사신의 무리한 요구', text:'청의 사신이 도착해 많은 공물과 접대를 요구합니다. 거절하면 국경이 시끄러워질 수 있습니다.',
+   options:[{id:'a', label:'후하게 대접하고 일부 수용', desc:'공물을 늘려 주고 관계를 지킨다.', eff:{tr:-4, df:2, cr:-2}},
+            {id:'b', label:'정중히 거절', desc:'예는 갖추되 공물은 늘리지 않는다.', eff:{cr:3, df:-3}}],
+   ignore:{eff:{cr:-3, df:-3}, note:'사신을 제대로 응대하지 못해 외교 관계가 나빠졌습니다.'}, modern:'외교 협상·통상 압력 대응'},
+  {id:'petition', icon:'疏', title:'유생 만인소', text:'전국의 유생 만 명이 이름을 올린 상소가 궁궐 앞에 도착했습니다. 이번 정책을 거두라는 요구입니다.',
+   options:[{id:'a', label:'상소를 받아 재검토', desc:'유생 대표를 불러 의견을 듣는다.', eff:{pp:2, cr:-3, cu:2}},
+            {id:'b', label:'상소를 물리침', desc:'나라의 일은 조정이 정한다며 돌려보낸다.', eff:{cr:2, pp:-2, cu:-1}}],
+   ignore:{eff:{cr:-3, pp:-2}, note:'상소에 답하지 않자 유생들이 성균관을 비우고 떠났습니다(공관).'}, modern:'국민 청원·집단 민원'},
+  {id:'fire', icon:'火', title:'도성 큰불', text:'한밤중 시전 거리에서 시작된 불이 수백 채의 집을 태웠습니다.',
+   options:[{id:'a', label:'국고로 복구·이재민 구호', desc:'나라 돈으로 집을 다시 짓고 이재민을 돕는다.', eff:{tr:-5, pp:4, lv:1}},
+            {id:'b', label:'백성 부역으로 복구', desc:'백성을 동원해 빠르게 복구한다.', eff:{lv:-3, pp:-2, tr:-1}}],
+   ignore:{eff:{pp:-5, lv:-3}, note:'불탄 거리를 그대로 두어 민심이 크게 흔들렸습니다.'}, modern:'특별 재난 지역 선포·재해 복구'},
+  {id:'pirates', icon:'寇', title:'해안에 왜구 출몰', text:'남해안 마을에 왜구가 나타나 곡식과 사람을 약탈하고 있습니다.',
+   options:[{id:'a', label:'수군 출동', desc:'수군을 보내 왜구를 쫓아낸다.', eff:{df:3, tr:-4, pp:1}},
+            {id:'b', label:'해안 마을 내륙 이주', desc:'백성을 안쪽으로 옮겨 피해를 줄인다.', eff:{lv:-4, df:1}}],
+   ignore:{eff:{lv:-4, df:-3, pp:-2}, note:'왜구의 약탈이 계속되어 해안 마을이 비었습니다.'}, modern:'해양 안보·해경 활동'},
+  {id:'harvest', icon:'豊', title:'뜻밖의 대풍년', text:'날씨가 좋아 온 나라에 풍년이 들었습니다. 곡식값이 크게 떨어지고 있습니다.',
+   options:[{id:'a', label:'상평창에 곡식 비축', desc:'남는 곡식을 사들여 흉년에 대비한다.', eff:{tr:3, lv:2, df:1}},
+            {id:'b', label:'세금 감면으로 환원', desc:'풍년의 기쁨을 세금 감면으로 나눈다.', eff:{pp:5, tr:-2}}],
+   ignore:{eff:{lv:1, tr:-1}, note:'곡식값이 폭락해 농민 소득이 기대보다 늘지 않았습니다.'}, modern:'정부 비축 제도·물가 안정 정책'},
+  {id:'comet', icon:'彗', title:'혜성 출현과 예언서', text:'밤하늘에 꼬리별이 나타나자 나라가 망한다는 예언서가 장터마다 돌고 있습니다.',
+   options:[{id:'a', label:'관상감이 천문 원리 설명', desc:'천문 관리를 보내 혜성의 원리를 알린다.', eff:{cu:3, pp:2, tr:-1}},
+            {id:'b', label:'예언서 유포자 처벌', desc:'헛소문을 퍼뜨리는 자를 잡아들인다.', eff:{cr:2, pp:-2}}],
+   ignore:{eff:{pp:-4, cr:-2}, note:'예언서가 퍼지며 민심이 불안해졌습니다.'}, modern:'가짜 뉴스 대응·과학 소통'},
+  {id:'exam', icon:'試', title:'과거 시험 부정 발각', text:'이번 과거 시험에서 답안을 바꿔치기한 부정이 드러났습니다. 권세가 자제가 연루되었다는 소문입니다.',
+   options:[{id:'a', label:'재시험과 엄벌', desc:'시험을 다시 치르고 관련자를 처벌한다.', eff:{cr:3, cu:2, tr:-2, pp:1}},
+            {id:'b', label:'조용히 덮기', desc:'권세가와의 충돌을 피한다.', eff:{cr:-1, pp:-3}}],
+   ignore:{eff:{pp:-3, cu:-2}, note:'부정을 방치해 인재 선발에 대한 믿음이 무너졌습니다.'}, modern:'공정 채용·부정 청탁 금지'},
+  {id:'ship', icon:'船', title:'이양선 출현', text:'모양이 낯선 큰 배가 해안을 따라 오가며 바다의 깊이를 재고 있습니다.',
+   options:[{id:'a', label:'역관을 보내 의도 파악', desc:'말이 통하는 관리를 보내 무슨 배인지 알아본다.', eff:{cu:3, df:1, cr:-1}},
+            {id:'b', label:'포를 쏘아 쫓아냄', desc:'경고 포격으로 해안에 다가오지 못하게 한다.', eff:{df:2, cr:2, tr:-3}}],
+   ignore:{eff:{df:-3, pp:-2}, note:'정체 모를 배를 내버려 두어 해안 백성이 불안에 떨었습니다.'}, modern:'영해 관리·외교 정보 수집'},
+  {id:'merchant', icon:'商', title:'거상의 헌납 제안', text:'한양의 큰 상인이 나라에 큰돈을 바치겠다며 그 대가로 특정 물품을 혼자 팔 권리를 달라고 합니다.',
+   options:[{id:'a', label:'받고 독점권 부여', desc:'당장 국고를 채운다.', eff:{tr:6, lv:-2, pp:-2}},
+            {id:'b', label:'거절', desc:'시장의 공정을 지킨다.', eff:{cr:1, lv:1}}],
+   ignore:{eff:{}, note:'제안에 답하지 않아 상인이 돌아갔습니다.'}, modern:'정경 유착·독점 규제'}
+];
+function surpriseById(id){ return SURPRISES.filter(s => s.id === id)[0]; }
+
 /* 조선 국정 회의(의정부판) — 게임 규칙 */
 const SKEYS = ['tr','pp','cr','df','lv','cu'];
 
@@ -268,7 +319,7 @@ function packEffect(turn, ids){
 }
 
 /* 한 사건 처리. pack = {adopt:[{id, by, role, why, modern}], why} 또는 null(합의안 미제출) */
-function playTurn(g, pack){
+function playTurn(g, pack, sur){
   const turn = ERA.turns[g.t];
   const before = Object.assign({}, g.st), notes = [], d = {};
   const adopt = pack ? pack.adopt.filter(a => policyOf(turn, a.id)).slice(0, MAX_ADOPT) : [];
@@ -277,6 +328,14 @@ function playTurn(g, pack){
   addTo(d, {tr: ERA.income});
   if(!adopt.length){ addTo(d, {cr:-4, pp:-3}); notes.push({type:'crisis', text:'의정부가 합의안을 올리지 못해 위기를 방치했습니다.'}); }
   addTo(d, packEffect(turn, ids));
+  // 돌발 이벤트 대응
+  let surLog = null;
+  if(sur && surpriseById(sur.id)){
+    const S = surpriseById(sur.id), o = S.options.filter(x => x.id === sur.resp)[0];
+    if(o){ addTo(d, o.eff); notes.push({type:'surprise', text:'돌발 「' + S.title + '」 → ' + o.label}); }
+    else { addTo(d, S.ignore.eff); notes.push({type:'crisis', text:'돌발 「' + S.title + '」 미대응: ' + S.ignore.note}); }
+    surLog = {id:S.id, resp:o ? o.id : null};
+  }
   (turn.combos || []).forEach(c => { if(c.ids.every(x => ids.indexOf(x) >= 0)){ addTo(d, c.eff); notes.push({type: c.good ? 'combo' : 'clash', text: c.note}); } });
   // 지연 효과 도착
   g.pending = g.pending.filter(p => { if(p.due === g.t){ addTo(d, p.eff); notes.push({type:'later', text:p.note}); return false; } return true; });
@@ -299,7 +358,7 @@ function playTurn(g, pack){
 
   const delta = {}; for(const k of SKEYS) delta[k] = Math.round((g.st[k] - before[k])*10)/10;
   const log = {t:g.t, year:turn.year, title:turn.title, adopt:adopt, why:pack ? String(pack.why || '') : '', delta:delta, notes:notes,
-               matches: ids.filter(x => turn.real.ids.indexOf(x) >= 0).length};
+               matches: ids.filter(x => turn.real.ids.indexOf(x) >= 0).length, sur:surLog};
   g.log.push(log);
   g.t++;
   g.hist.push(Object.assign({}, g.st));
@@ -333,7 +392,7 @@ function realMatches(g){ return g.log.reduce((a, l) => a + (l.matches || 0), 0);
 const ROOM_TTL = 21600; // 6시간
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const TOTAL = 7;
-const LOG_HEAD = ['기록 시각','방','학급','사건 번호','연도','사건','모둠','모둠원(역할)','시행 정책','실제 역사와 같은 정책 수','합의안 근거(영의정)','국고','민심','왕권','국방','민생','문화','점수'];
+const LOG_HEAD = ['기록 시각','방','학급','사건 번호','연도','사건','모둠','모둠원(역할)','시행 정책','실제 역사와 같은 정책 수','합의안 근거(영의정)','돌발 이벤트','돌발 대응','국고','민심','왕권','국방','민생','문화','점수'];
 const PROP_HEAD = ['기록 시각','방','학급','사건 번호','사건','모둠','제안자','역할','제안 정책','채택','제안 근거','학생이 쓴 비슷한 현대 정책','참고: 현대 정책 해설','실제 역사에서 시행'];
 const FINAL_HEAD = ['제출 시각','방','학급','모둠','이름','역할','모둠 점수','순위','실제 역사와 같은 정책 수','국고','민심','왕권','국방','민생','문화','위기','성찰1: 내 조의 결정과 실제 역사','성찰2: 조선 정책과 현대 정책 비교','성찰3: 의정부 합의 과정'];
 
@@ -384,6 +443,14 @@ function putRoom(r, backup) {
 /* 제안은 용량이 커서 모둠마다 따로 저장(방 상태 100KB 한도 대비) */
 function getProps(r, t) { const c = CacheService.getScriptCache().get('props_' + r.code + '_' + t.id); return c ? JSON.parse(c) : {}; }
 function setProps(r, t, p) { CacheService.getScriptCache().put('props_' + r.code + '_' + t.id, JSON.stringify(p), ROOM_TTL); t.np = Object.keys(p).length; }
+function pickSurprise(r) {
+  r.usedSur = r.usedSur || [];
+  let pool = SURPRISES.filter(x => r.usedSur.indexOf(x.id) < 0);
+  if (!pool.length) { r.usedSur = []; pool = SURPRISES.slice(); }
+  const S = pool[Math.floor(Math.random() * pool.length)];
+  r.usedSur.push(S.id);
+  return { id: S.id, delay: 60 + Math.floor(Math.random() * 90), fired: false, at: null };
+}
 function memberList(t) { return t.mo.map(id => t.mem[id]); }
 function roleNames(m) { return m.roles.map(x => roleById(x).name).join('·'); }
 function membersText(t) { return memberList(t).map(m => m.name + '(' + (roleNames(m) || '역할 없음') + ')').join(', '); }
@@ -399,10 +466,11 @@ function canDecide(t, m) { return m.roles.indexOf('yeong') >= 0 || !hasRole(t, '
 function publicRoom(r) {
   return {
     code: r.code, cls: r.cls, phase: r.phase, turn: r.turn, total: TOTAL, ver: r.ver, openedAt: r.openedAt || null,
+    sur: !r.sur ? null : r.sur.fired ? { id: r.sur.id, at: r.sur.at } : { pending: true, delay: r.sur.delay },
     teams: r.order.map(id => {
       const t = r.teams[id], g = t.game;
       return { id: t.id, name: t.name, members: memberList(t).map(m => ({ id: m.id, name: m.name, roles: m.roles, final: !!m.final })),
-        submitted: !!t.sub, props: t.np || 0,
+        submitted: !!t.sub, props: t.np || 0, responded: !!t.sresp,
         st: g.st, hist: g.hist, crises: g.crises, log: g.log, done: g.done, lateNotes: g.lateNotes || [],
         score: scoreOf(g), matches: realMatches(g) };
     })
@@ -417,7 +485,7 @@ function doGet(e) {
     if (p.ver && Number(p.ver) === r.ver) return out({ ok: true, same: true, ver: r.ver });
     const pub = publicRoom(r);
     // 우리 모둠의 제안과 합의안은 같은 모둠원에게만
-    if (p.team && r.teams[p.team]) { const mt = r.teams[p.team]; pub.myProps = getProps(r, mt); pub.mySub = mt.sub ? { adopt: mt.sub.ids.map(x => ({ id: x })), why: mt.sub.why, by: mt.sub.by } : null; }
+    if (p.team && r.teams[p.team]) { const mt = r.teams[p.team]; pub.myProps = getProps(r, mt); pub.mySresp = mt.sresp || null; pub.mySub = mt.sub ? { adopt: mt.sub.ids.map(x => ({ id: x })), why: mt.sub.why, by: mt.sub.by } : null; }
     return out({ ok: true, room: pub });
   }
   return out({ ok: true, msg: '조선 국정 회의 서버가 작동 중입니다.' });
@@ -495,6 +563,16 @@ function handle(d) {
         else { r.turn++; r.phase = 'deciding'; }
       } else return { ok: false, error: '지금은 다음 단계로 넘어갈 수 없습니다.' };
       r.openedAt = Date.now();
+      r.sur = null;
+      if (r.phase === 'deciding') { r.order.forEach(id => { r.teams[id].sresp = null; }); if (Math.random() < SURPRISE_RATE) r.sur = pickSurprise(r); }
+      putRoom(r, true);
+      return { ok: true };
+    }
+    if (d.cmd === 'surprise') {
+      if (r.phase !== 'deciding') return { ok: false, error: '사건이 열려 있을 때만 돌발 이벤트를 일으킬 수 있습니다.' };
+      if (r.sur && r.sur.fired) return { ok: false, error: '이번 사건에는 이미 돌발 이벤트가 일어났습니다.' };
+      if (!r.sur) r.sur = pickSurprise(r);
+      r.sur.fired = true; r.sur.at = Date.now();
       putRoom(r, true);
       return { ok: true };
     }
@@ -506,10 +584,12 @@ function handle(d) {
         if (g.t !== r.turn) return;
         const props = getProps(r, t);
         const pack = t.sub ? { why: t.sub.why, adopt: t.sub.ids.filter(x => props[x]).map(x => ({ id: x, by: props[x].name, role: props[x].role, why: props[x].why, modern: props[x].modern })) } : null;
-        const l = playTurn(g, pack && pack.adopt.length ? pack : null);
+        const sur = r.sur && r.sur.fired ? { id: r.sur.id, resp: t.sresp || null } : null;
+        const l = playTurn(g, pack && pack.adopt.length ? pack : null, sur);
+        const S = sur ? surpriseById(sur.id) : null, so = S && S.options.filter(x => x.id === sur.resp)[0];
         const adopted = l.adopt.map(a => a.id);
         logRows.push([now, r.code, r.cls, r.turn + 1, turn.year, turn.title, t.name, membersText(t),
-          l.adopt.map(a => policyOf(turn, a.id).name).join(', ') || '(합의안 없음)', l.matches, l.why,
+          l.adopt.map(a => policyOf(turn, a.id).name).join(', ') || '(합의안 없음)', l.matches, l.why, S ? S.title : '', S ? (so ? so.label : '대응 못 함') : '',
           g.st.tr, g.st.pp, g.st.cr, g.st.df, g.st.lv, g.st.cu, scoreOf(g)]);
         Object.keys(props).forEach(pid => {
           const p = props[pid], pol = policyOf(turn, pid);
@@ -518,9 +598,10 @@ function handle(d) {
         // 방 상태 용량을 줄이려고 기록에는 핵심만 남김(전문은 시트에 저장)
         l.adopt = l.adopt.map(a => ({ id: a.id, by: a.by, role: a.role, modern: txt(a.modern, 60) }));
         l.why = '';
-        setProps(r, t, {}); t.sub = null;
+        setProps(r, t, {}); t.sub = null; t.sresp = null;
       });
       r.phase = 'revealed';
+      r.sur = null;
       putRoom(r, true);
       appendRows('기록', LOG_HEAD, logRows);
       appendRows('제안', PROP_HEAD, propRows);
@@ -579,6 +660,13 @@ function handle(d) {
     if (why.length < 30) return { ok: false, error: '합의안 근거를 30자 이상 쓰세요.' };
     t.sub = { ids: ids, why: why, by: m.name, at: Date.now() };
     putRoom(r, false); return { ok: true };
+  }
+  if (d.action === 'respond') {
+    if (r.phase !== 'deciding' || !r.sur || !r.sur.fired) return { ok: false, error: '지금은 대응할 돌발 이벤트가 없습니다.' };
+    if (!canDecide(t, m)) return { ok: false, error: '돌발 대응은 영의정이 정합니다.' };
+    const S = surpriseById(r.sur.id);
+    if (!S.options.some(o => o.id === d.choice)) return { ok: false, error: '대응을 고르세요.' };
+    t.sresp = d.choice; putRoom(r, false); return { ok: true };
   }
   if (d.action === 'retract') {
     if (r.phase !== 'deciding') return { ok: false, error: '지금은 고칠 수 없습니다.' };

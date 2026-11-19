@@ -33,6 +33,9 @@ function runBots(room){
   if (!DEMO || !room || room.phase !== 'deciding') return;
   getBots(room.code).forEach((b, i) => {
     const t = room.teams.find(x => x.id === b.teamId), key = b.teamId + ':' + room.turn;
+    if (t && room.sur && room.sur.id && !t.responded && !botTimers[key + ':s']) {
+      botTimers[key + ':s'] = setTimeout(() => API.post({ action: 'respond', code: room.code, teamId: b.teamId, memberId: b.memberId, choice: Math.random() < 0.5 ? 'a' : 'b' }), 2000 + i * 1500 + Math.random() * 3000);
+    }
     if (!t || t.submitted || botTimers[key]) return;
     const turn = ERA.turns[room.turn];
     botTimers[key] = setTimeout(() => {

@@ -33,17 +33,18 @@ function teamCard(room, t, o){
   const r=rankOf(room,t.id), last=t.log[t.log.length-1];
   let badge='';
   if(room.phase==='deciding') badge = t.submitted ? '<span class="stamp pop">裁可 상신</span>' : `<span class="waiting">논의 중… 제안 ${t.props}</span>`;
+  const sb = room.phase==='deciding' && room.sur && room.sur.id ? `<span class="sbadge ${t.responded?'ok':''}">${t.responded?'돌발 대응 완료':'돌발 대응 중…'}</span>` : '';
   const turn=curTurn(room);
   const adopted = room.phase==='revealed' && last && last.t===room.turn ? `<div class="chips" style="gap:4px">${last.adopt.length?last.adopt.map(a=>{ const p=policyOf(turn,a.id); return `<span class="cchip ${turn.real.ids.includes(a.id)?'real':''}">${esc(p?p.name:a.id)}</span>`; }).join(''):'<span class="small" style="color:var(--bad)">합의안 없음</span>'}</div>` : '';
-  return `<div class="tc ${o.me?'me':''}">${room.phase!=='lobby'?`<span class="rk r${r}">${r}</span>`:''}
-    <div class="nm"><b>${esc(t.name)}</b>${room.phase!=='lobby'?`<span class="sc num">${t.score}</span>`:''}</div>
-    ${badge}${kingdomSVG(t.st,{crisis:last&&last.notes.some(n=>n.type==='crisis')})}
+  return `<div class="tc nation ${o.me?'me':''}" style="--nc:${nationColor(room,t.id)}">${room.phase!=='lobby'?`<span class="rk r${r}">${r}</span>`:''}
+    <div class="nm">${flagSVG(room,t,28)}<b>${esc(t.name)}</b>${room.phase!=='lobby'?`<span class="sc num">${t.score}</span>`:''}</div>
+    ${badge}${sb}${kingdomSVG(t.st,{crisis:last&&last.notes.some(n=>n.type==='crisis')})}
     ${minibars(t.st)}${adopted}
     ${o.members?`<div class="small mlist">${t.members.map(memberLine).join('')||'<span class="muted">모둠원 없음</span>'}</div>`:''}</div>`;
 }
 function leaderboardHTML(room, myId){
   const list=ranked(room), max=Math.max(1,...list.map(t=>t.score));
-  return '<div class="lb">'+list.map((t,i)=>`<div class="lbr ${t.id===myId?'me':''}"><span class="num muted">${i+1}</span><b>${esc(t.name)}</b><span class="bb"><i style="width:${Math.max(2,t.score/max*100)}%"></i></span><span class="s num">${t.score}</span></div>`).join('')+'</div>';
+  return '<div class="lb">'+list.map((t,i)=>`<div class="lbr ${t.id===myId?'me':''}" style="--nc:${nationColor(room,t.id)}"><span class="num muted">${i+1}</span><b>${esc(t.name)}</b><span class="bb"><i style="width:${Math.max(2,t.score/max*100)}%"></i></span><span class="s num">${t.score}</span></div>`).join('')+'</div>';
 }
 
 /* 정책 카드(학생 화면의 6조 정책 목록) */
@@ -78,3 +79,12 @@ function openModal(html){
 }
 function closeModal(){ const m=document.getElementById('modal'); if(m){ m.remove(); if(modalReturn&&modalReturn.focus) try{ modalReturn.focus(); }catch(e){} } }
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeModal(); });
+
+/* 돌발 이벤트 카드 */
+function surpriseCardHTML(S, o){
+  o=o||{};
+  return `<div class="surx ${o.big?'big':''}"><div class="sxh"><span class="sxi">${esc(S.icon)}</span><div><div class="sxe">急報 · 돌발 이벤트</div><h3>${esc(S.title)}</h3></div></div>
+    <p>${esc(S.text)}</p>
+    <div class="sxo">${S.options.map(op=>`<${o.pick?'button type="button" data-sresp="'+op.id+'"':'div'} class="sxopt ${o.chosen===op.id?'on':''}"><b>${esc(op.label)}</b><span>${esc(op.desc)}</span><span class="tags">${tagsOf(op.eff)}</span></${o.pick?'button':'div'}>`).join('')}</div>
+    ${o.foot||''}</div>`;
+}

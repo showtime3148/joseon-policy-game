@@ -104,7 +104,7 @@ function lbAnimHTML(room, myId, turnIdx){
   const rows = room.teams.map(t => ({t, prev: prevScore(t, turnIdx)}));
   const byPrev = rows.slice().sort((a, b) => b.prev - a.prev);
   const max = Math.max(1, ...rows.map(r => Math.max(r.prev, r.t.score)));
-  return '<div class="lb">' + byPrev.map((r, i) => `<div class="lbr ${r.t.id === myId ? 'me' : ''}" data-score="${r.t.score}" data-prev="${r.prev}" data-prevrank="${i + 1}">
+  return '<div class="lb">' + byPrev.map((r, i) => `<div class="lbr ${r.t.id === myId ? 'me' : ''}" style="--nc:${nationColor(room, r.t.id)}" data-score="${r.t.score}" data-prev="${r.prev}" data-prevrank="${i + 1}">
     <span class="num muted">${i + 1}</span><b>${esc(r.t.name)} <span class="mv"></span></b><span class="bb"><i style="width:${Math.max(2, r.prev / max * 100)}%"></i></span><span class="s num">${r.prev}</span></div>`).join('') + '</div>';
 }
 /* 정책별로 어느 의정부가 시행했는지 */

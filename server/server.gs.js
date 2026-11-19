@@ -6,7 +6,7 @@
 const ROOM_TTL = 21600; // 6시간
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const TOTAL = 7;
-const LOG_HEAD = ['기록 시각','방','학급','사건 번호','연도','사건','모둠','모둠원(역할)','시행 정책','실제 역사와 같은 정책 수','합의안 근거(영의정)','국고','민심','왕권','국방','민생','문화','점수'];
+const LOG_HEAD = ['기록 시각','방','학급','사건 번호','연도','사건','모둠','모둠원(역할)','시행 정책','실제 역사와 같은 정책 수','합의안 근거(영의정)','돌발 이벤트','돌발 대응','국고','민심','왕권','국방','민생','문화','점수'];
 const PROP_HEAD = ['기록 시각','방','학급','사건 번호','사건','모둠','제안자','역할','제안 정책','채택','제안 근거','학생이 쓴 비슷한 현대 정책','참고: 현대 정책 해설','실제 역사에서 시행'];
 const FINAL_HEAD = ['제출 시각','방','학급','모둠','이름','역할','모둠 점수','순위','실제 역사와 같은 정책 수','국고','민심','왕권','국방','민생','문화','위기','성찰1: 내 조의 결정과 실제 역사','성찰2: 조선 정책과 현대 정책 비교','성찰3: 의정부 합의 과정'];
 
@@ -57,6 +57,14 @@ function putRoom(r, backup) {
 /* 제안은 용량이 커서 모둠마다 따로 저장(방 상태 100KB 한도 대비) */
 function getProps(r, t) { const c = CacheService.getScriptCache().get('props_' + r.code + '_' + t.id); return c ? JSON.parse(c) : {}; }
 function setProps(r, t, p) { CacheService.getScriptCache().put('props_' + r.code + '_' + t.id, JSON.stringify(p), ROOM_TTL); t.np = Object.keys(p).length; }
+function pickSurprise(r) {
+  r.usedSur = r.usedSur || [];
+  let pool = SURPRISES.filter(x => r.usedSur.indexOf(x.id) < 0);
+  if (!pool.length) { r.usedSur = []; pool = SURPRISES.slice(); }
+  const S = pool[Math.floor(Math.random() * pool.length)];
+  r.usedSur.push(S.id);
+  return { id: S.id, delay: 60 + Math.floor(Math.random() * 90), fired: false, at: null };
+}
 function memberList(t) { return t.mo.map(id => t.mem[id]); }
 function roleNames(m) { return m.roles.map(x => roleById(x).name).join('·'); }
 function membersText(t) { return memberList(t).map(m => m.name + '(' + (roleNames(m) || '역할 없음') + ')').join(', '); }
@@ -72,10 +80,11 @@ function canDecide(t, m) { return m.roles.indexOf('yeong') >= 0 || !hasRole(t, '
 function publicRoom(r) {
   return {
     code: r.code, cls: r.cls, phase: r.phase, turn: r.turn, total: TOTAL, ver: r.ver, openedAt: r.openedAt || null,
+    sur: !r.sur ? null : r.sur.fired ? { id: r.sur.id, at: r.sur.at } : { pending: true, delay: r.sur.delay },
     teams: r.order.map(id => {
       const t = r.teams[id], g = t.game;
       return { id: t.id, name: t.name, members: memberList(t).map(m => ({ id: m.id, name: m.name, roles: m.roles, final: !!m.final })),
-        submitted: !!t.sub, props: t.np || 0,
+        submitted: !!t.sub, props: t.np || 0, responded: !!t.sresp,
         st: g.st, hist: g.hist, crises: g.crises, log: g.log, done: g.done, lateNotes: g.lateNotes || [],
         score: scoreOf(g), matches: realMatches(g) };
     })
@@ -90,7 +99,7 @@ function doGet(e) {
     if (p.ver && Number(p.ver) === r.ver) return out({ ok: true, same: true, ver: r.ver });
     const pub = publicRoom(r);
     // 우리 모둠의 제안과 합의안은 같은 모둠원에게만
-    if (p.team && r.teams[p.team]) { const mt = r.teams[p.team]; pub.myProps = getProps(r, mt); pub.mySub = mt.sub ? { adopt: mt.sub.ids.map(x => ({ id: x })), why: mt.sub.why, by: mt.sub.by } : null; }
+    if (p.team && r.teams[p.team]) { const mt = r.teams[p.team]; pub.myProps = getProps(r, mt); pub.mySresp = mt.sresp || null; pub.mySub = mt.sub ? { adopt: mt.sub.ids.map(x => ({ id: x })), why: mt.sub.why, by: mt.sub.by } : null; }
     return out({ ok: true, room: pub });
   }
   return out({ ok: true, msg: '조선 국정 회의 서버가 작동 중입니다.' });
@@ -168,6 +177,16 @@ function handle(d) {
         else { r.turn++; r.phase = 'deciding'; }
       } else return { ok: false, error: '지금은 다음 단계로 넘어갈 수 없습니다.' };
       r.openedAt = Date.now();
+      r.sur = null;
+      if (r.phase === 'deciding') { r.order.forEach(id => { r.teams[id].sresp = null; }); if (Math.random() < SURPRISE_RATE) r.sur = pickSurprise(r); }
+      putRoom(r, true);
+      return { ok: true };
+    }
+    if (d.cmd === 'surprise') {
+      if (r.phase !== 'deciding') return { ok: false, error: '사건이 열려 있을 때만 돌발 이벤트를 일으킬 수 있습니다.' };
+      if (r.sur && r.sur.fired) return { ok: false, error: '이번 사건에는 이미 돌발 이벤트가 일어났습니다.' };
+      if (!r.sur) r.sur = pickSurprise(r);
+      r.sur.fired = true; r.sur.at = Date.now();
       putRoom(r, true);
       return { ok: true };
     }
@@ -179,10 +198,12 @@ function handle(d) {
         if (g.t !== r.turn) return;
         const props = getProps(r, t);
         const pack = t.sub ? { why: t.sub.why, adopt: t.sub.ids.filter(x => props[x]).map(x => ({ id: x, by: props[x].name, role: props[x].role, why: props[x].why, modern: props[x].modern })) } : null;
-        const l = playTurn(g, pack && pack.adopt.length ? pack : null);
+        const sur = r.sur && r.sur.fired ? { id: r.sur.id, resp: t.sresp || null } : null;
+        const l = playTurn(g, pack && pack.adopt.length ? pack : null, sur);
+        const S = sur ? surpriseById(sur.id) : null, so = S && S.options.filter(x => x.id === sur.resp)[0];
         const adopted = l.adopt.map(a => a.id);
         logRows.push([now, r.code, r.cls, r.turn + 1, turn.year, turn.title, t.name, membersText(t),
-          l.adopt.map(a => policyOf(turn, a.id).name).join(', ') || '(합의안 없음)', l.matches, l.why,
+          l.adopt.map(a => policyOf(turn, a.id).name).join(', ') || '(합의안 없음)', l.matches, l.why, S ? S.title : '', S ? (so ? so.label : '대응 못 함') : '',
           g.st.tr, g.st.pp, g.st.cr, g.st.df, g.st.lv, g.st.cu, scoreOf(g)]);
         Object.keys(props).forEach(pid => {
           const p = props[pid], pol = policyOf(turn, pid);
@@ -191,9 +212,10 @@ function handle(d) {
         // 방 상태 용량을 줄이려고 기록에는 핵심만 남김(전문은 시트에 저장)
         l.adopt = l.adopt.map(a => ({ id: a.id, by: a.by, role: a.role, modern: txt(a.modern, 60) }));
         l.why = '';
-        setProps(r, t, {}); t.sub = null;
+        setProps(r, t, {}); t.sub = null; t.sresp = null;
       });
       r.phase = 'revealed';
+      r.sur = null;
       putRoom(r, true);
       appendRows('기록', LOG_HEAD, logRows);
       appendRows('제안', PROP_HEAD, propRows);
@@ -252,6 +274,13 @@ function handle(d) {
     if (why.length < 30) return { ok: false, error: '합의안 근거를 30자 이상 쓰세요.' };
     t.sub = { ids: ids, why: why, by: m.name, at: Date.now() };
     putRoom(r, false); return { ok: true };
+  }
+  if (d.action === 'respond') {
+    if (r.phase !== 'deciding' || !r.sur || !r.sur.fired) return { ok: false, error: '지금은 대응할 돌발 이벤트가 없습니다.' };
+    if (!canDecide(t, m)) return { ok: false, error: '돌발 대응은 영의정이 정합니다.' };
+    const S = surpriseById(r.sur.id);
+    if (!S.options.some(o => o.id === d.choice)) return { ok: false, error: '대응을 고르세요.' };
+    t.sresp = d.choice; putRoom(r, false); return { ok: true };
   }
   if (d.action === 'retract') {
     if (r.phase !== 'deciding') return { ok: false, error: '지금은 고칠 수 없습니다.' };

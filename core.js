@@ -22,7 +22,7 @@ function packEffect(turn, ids){
 }
 
 /* 한 사건 처리. pack = {adopt:[{id, by, role, why, modern}], why} 또는 null(합의안 미제출) */
-function playTurn(g, pack){
+function playTurn(g, pack, sur){
   const turn = ERA.turns[g.t];
   const before = Object.assign({}, g.st), notes = [], d = {};
   const adopt = pack ? pack.adopt.filter(a => policyOf(turn, a.id)).slice(0, MAX_ADOPT) : [];
@@ -31,6 +31,14 @@ function playTurn(g, pack){
   addTo(d, {tr: ERA.income});
   if(!adopt.length){ addTo(d, {cr:-4, pp:-3}); notes.push({type:'crisis', text:'의정부가 합의안을 올리지 못해 위기를 방치했습니다.'}); }
   addTo(d, packEffect(turn, ids));
+  // 돌발 이벤트 대응
+  let surLog = null;
+  if(sur && surpriseById(sur.id)){
+    const S = surpriseById(sur.id), o = S.options.filter(x => x.id === sur.resp)[0];
+    if(o){ addTo(d, o.eff); notes.push({type:'surprise', text:'돌발 「' + S.title + '」 → ' + o.label}); }
+    else { addTo(d, S.ignore.eff); notes.push({type:'crisis', text:'돌발 「' + S.title + '」 미대응: ' + S.ignore.note}); }
+    surLog = {id:S.id, resp:o ? o.id : null};
+  }
   (turn.combos || []).forEach(c => { if(c.ids.every(x => ids.indexOf(x) >= 0)){ addTo(d, c.eff); notes.push({type: c.good ? 'combo' : 'clash', text: c.note}); } });
   // 지연 효과 도착
   g.pending = g.pending.filter(p => { if(p.due === g.t){ addTo(d, p.eff); notes.push({type:'later', text:p.note}); return false; } return true; });
@@ -53,7 +61,7 @@ function playTurn(g, pack){
 
   const delta = {}; for(const k of SKEYS) delta[k] = Math.round((g.st[k] - before[k])*10)/10;
   const log = {t:g.t, year:turn.year, title:turn.title, adopt:adopt, why:pack ? String(pack.why || '') : '', delta:delta, notes:notes,
-               matches: ids.filter(x => turn.real.ids.indexOf(x) >= 0).length};
+               matches: ids.filter(x => turn.real.ids.indexOf(x) >= 0).length, sur:surLog};
   g.log.push(log);
   g.t++;
   g.hist.push(Object.assign({}, g.st));
