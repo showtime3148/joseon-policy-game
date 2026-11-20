@@ -39,11 +39,12 @@ function runBots(room){
     if (!t || t.submitted || botTimers[key]) return;
     const turn = ERA.turns[room.turn];
     botTimers[key] = setTimeout(() => {
-      const pool = turn.policies.map(p => p.id).sort(() => Math.random() - 0.5);
-      const pick = Math.random() < 0.4 ? turn.real.ids.slice(0, MAX_ADOPT) : pool.slice(0, 2 + Math.floor(Math.random() * 3));
+      // 6조가 각자 하나씩: 실제 역사 정책이 있으면 가끔 그것을, 아니면 무작위
+      const pick = 'ihybkg'.split('').map(d => { const opts = turn.policies.filter(p => p.id.charAt(0) === d).map(p => p.id); const real = opts.find(x => turn.real.ids.indexOf(x) >= 0);
+        return real && Math.random() < 0.4 ? real : opts[Math.floor(Math.random() * opts.length)]; });
       const base = { code: room.code, teamId: b.teamId, memberId: b.memberId, turn: room.turn };
       pick.reduce((p, pid, k) => p.then(() => API.post(Object.assign({ action: 'propose', pid: pid, why: '이 사건을 해결하는 데 꼭 필요한 정책이라고 판단했다.', modern: BOT_MODERN[(i + k) % BOT_MODERN.length] }, base))), Promise.resolve())
-        .then(() => API.post(Object.assign({ action: 'submit', adopt: pick, why: BOT_WHY[i % 3] }, base)));
+        .then(() => API.post(Object.assign({ action: 'submit', why: BOT_WHY[i % 3] }, base)));
     }, 2500 + i * 1800 + Math.random() * 2500);
   });
 }

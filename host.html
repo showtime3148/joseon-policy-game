@@ -92,7 +92,7 @@ function ctlHTML(){
   if(room.phase==='deciding'){ const sr=room.sur, rn=room.teams.filter(t=>t.responded).length;
     const sx = sr&&sr.id ? `<span class="pill bad" style="font-size:15px">돌발 「${esc(surpriseById(sr.id).title)}」 대응 ${rn}/${N}</span>`
       : `${sr&&sr.pending&&H.autoSur!==false?`<span class="small muted" id="surwait">돌발 이벤트 대기 중</span>`:''}<button class="btn" data-cmd="surprise">돌발 이벤트 일으키기</button>`;
-    left=`<span class="timer" id="timer">00:00</span><span class="pill ${n===N?'good':'navy'}" style="font-size:15px">합의안 상신 ${n}/${N}</span>${sx}`;
+    left=`<span class="timer" id="timer">00:00</span><span class="pill ${n===N?'good':'navy'}" style="font-size:15px">결정 상신 ${n}/${N}</span>${sx}`;
     right=`<button class="btn primary big" data-cmd="reveal">${n<N?'결과 공개 ('+(N-n)+'곳 미상신)':'결과 공개'}</button>`; }
   if(room.phase==='revealed'){ const last=room.turn+1>=ERA.turns.length; left=`<span class="pill good" style="font-size:15px">사건 ${room.turn+1}/${ERA.turns.length} 결과</span>`;
     right=`<button class="btn primary big" data-cmd="open">${last?'최종 결과 보기':'다음 사건 열기'}</button>`; }
@@ -131,9 +131,9 @@ function vSetup(){
     <details class="card"><summary style="cursor:pointer;font-weight:700">수업 진행 방법</summary><ol>
       <li>방을 만들면 네 글자 방 코드가 나옵니다. 교실 화면에 띄워 두세요.</li>
       <li>학생은 각자 기기로 <b>${esc(joinUrl())}</b> 에 들어가 방 코드, 모둠(의정부) 이름, 번호·이름을 쓰고 역할(영의정, 이·호·예·병·형·공조 판서)을 고릅니다. 모둠원이 적으면 한 사람이 두 조를 겸합니다.</li>
-      <li><b>첫 사건 열기</b>를 누르면 모든 의정부에 같은 사건이 열립니다. 판서는 자기 조 정책을 근거와 <b>비슷한 현대 정책</b>을 적어 제안하고, 영의정이 최대 ${MAX_ADOPT}개를 묶어 합의안을 상신합니다.</li>
+      <li><b>첫 사건 열기</b>를 누르면 모든 의정부에 같은 사건이 열립니다. 6조 판서는 각자 자기 조 정책 3개 중 하나를 근거와 <b>비슷한 현대 정책</b>을 적어 고르고, 영의정이 6조의 결정을 상신합니다. 여러 조의 정책이 맞물리면 <b>시너지 보너스</b>, 부딪히면 감점이 있습니다.</li>
       <li><b>결과 공개</b>를 누르면 의정부별 시행 정책, 지표 변화, 현대 정책 해설이 공개됩니다. 토의한 뒤 <b>실제 역사 공개</b>를 누르세요.</li>
-      <li>7개 사건이 끝나면 학생마다 성찰을 제출합니다. <b>기록 내려받기(엑셀)</b>를 누르면 <b>기록</b>(의정부별 합의안), <b>제안</b>(학생별 제안·현대 정책), <b>제출</b>(개인 성찰) 시트가 담긴 파일을 받습니다. 기록은 30일 동안 보관되어 이 화면의 '지난 방 기록'에서 다시 받을 수 있습니다.</li></ol></details>
+      <li>7개 사건이 끝나면 학생마다 성찰을 제출합니다. <b>기록 내려받기(엑셀)</b>를 누르면 <b>기록</b>(의정부별 결정·시너지), <b>제안</b>(학생별 제안·현대 정책), <b>제출</b>(개인 성찰) 시트가 담긴 파일을 받습니다. 기록은 30일 동안 보관되어 이 화면의 '지난 방 기록'에서 다시 받을 수 있습니다.</li></ol></details>
   </div>`;
 }
 
@@ -142,7 +142,7 @@ function vLobby(){
   $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">
     <div class="card joinbox"><div><div class="eyebrow">방 코드</div><div class="code">${room.code}</div><p class="muted" style="margin:8px 0 0; font-size:17px">접속 주소 <b style="color:var(--ink)">${esc(joinUrl())}</b></p></div>
       <div><div class="eyebrow">${ERA.period}</div><h2 style="font-size:30px">${esc(ERA.title)}</h2><div class="row" style="margin-top:10px; gap:6px">${ROLES.map(r=>roleTag(r.id)).join('')}</div>
-        <p class="small muted" style="margin:8px 0 0">영의정이 합의안을 상신하고, 6조 판서가 자기 조의 정책을 제안합니다.</p></div></div>
+        <p class="small muted" style="margin:8px 0 0">6조 판서가 자기 조의 정책을 하나씩 고르고, 영의정이 상신합니다. 조끼리 손발이 맞으면 시너지 보너스!</p></div></div>
     <div class="card"><h3 style="font-size:20px; margin-bottom:10px">입궐한 의정부</h3><div id="live">${gridHTML()}</div></div></div>`;
 }
 
@@ -153,7 +153,7 @@ function vDecide(){
   $app.innerHTML=`<div class="ctrl" id="ctl">${ctlHTML()}</div><div class="stack">${stepsHTML()}
     <div class="card evscene">${eventScene(turn.art, turn.war)}<div><div class="yr" style="font-size:18px">${turn.year}년 · ${esc(turn.reign)}</div><h2>${esc(turn.title)}</h2><p>${esc(turn.text)}</p>${turn.war?'<p style="margin-top:10px"><span class="pill bad" style="font-size:15px">전쟁 · 국방력이 피해를 좌우합니다</span></p>':''}</div></div>
     <div id="hsur">${room.sur&&room.sur.id?surpriseCardHTML(surpriseById(room.sur.id)):''}</div>
-    <div class="card stack"><h3 style="font-size:20px">6조의 정책 <span class="small muted" style="font-family:var(--body)">의정부마다 최대 ${MAX_ADOPT}개를 묶어 시행</span></h3>
+    <div class="card stack"><h3 style="font-size:20px">6조의 정책 <span class="small muted" style="font-family:var(--body)">각 조가 3개 중 하나씩 · 맞물리면 시너지</span></h3>
       <div class="hpols">${turn.policies.map(p=>policyHTML(turn,p)).join('')}</div></div>
     <div class="card"><h3 style="font-size:20px; margin-bottom:10px">의정부별 논의 현황</h3><div id="live">${gridHTML()}</div></div></div>`;
   startTimer();
@@ -183,6 +183,7 @@ function vReveal(){
       <div data-at="3200" data-fx="chips">${distAnimHTML(room, room.turn, null)}</div>
       ${realFlipHTML(turn, anyMatch, null, true)}
       ${crises?`<div class="row">${crises}</div>`:''}</div>
+    <div class="card stack" data-at="2600"><h3 style="font-size:20px">이번 사건의 시너지 도감 <span class="small muted" style="font-family:var(--body)">어떤 조의 정책이 맞물렸나?</span></h3>${synergyHTML(room, room.turn, null)}</div>
     ${modernAll(turn)}
     <div style="display:grid; grid-template-columns:1fr 380px; gap:16px; align-items:start" class="rv">
       <div class="card"><h3 style="font-size:20px; margin-bottom:10px">각 나라의 모습</h3><div id="live">${gridHTML()}</div></div>

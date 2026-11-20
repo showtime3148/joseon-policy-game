@@ -10,7 +10,7 @@ function deptOf(pid){ return roleById(String(pid).charAt(0)); }
 function policyOf(turn, pid){ return turn.policies.filter(p => p.id === pid)[0]; }
 
 function initGame(){
-  return {t:0, st:Object.assign({}, ERA.start), hist:[Object.assign({}, ERA.start)], pending:[], crises:[], log:[], done:false};
+  return {t:0, st:Object.assign({}, ERA.start), hist:[Object.assign({}, ERA.start)], pending:[], crises:[], log:[], done:false, bonus:0};
 }
 function applyStats(st, d){ for(const k of SKEYS) st[k] = clamp(Math.round((st[k] + (d[k]||0))*10)/10, 0, 100); }
 
@@ -29,7 +29,8 @@ function playTurn(g, pack, sur){
   const ids = adopt.map(a => a.id);
   addTo(d, turn.base);
   addTo(d, {tr: ERA.income});
-  if(!adopt.length){ addTo(d, {cr:-4, pp:-3}); notes.push({type:'crisis', text:'의정부가 합의안을 올리지 못해 위기를 방치했습니다.'}); }
+  if(!adopt.length){ addTo(d, {cr:-4, pp:-3}); notes.push({type:'crisis', text:'의정부가 아무 정책도 내지 못해 위기를 방치했습니다.'}); }
+  else if(pack.unsent){ addTo(d, {cr:-2}); notes.push({type:'clash', text:'영의정의 상신 없이 각 조가 따로 정책을 시행해 조정의 위신이 떨어졌습니다.'}); }
   addTo(d, packEffect(turn, ids));
   // 돌발 이벤트 대응
   let surLog = null;
@@ -39,7 +40,12 @@ function playTurn(g, pack, sur){
     else { addTo(d, S.ignore.eff); notes.push({type:'crisis', text:'돌발 「' + S.title + '」 미대응: ' + S.ignore.note}); }
     surLog = {id:S.id, resp:o ? o.id : null};
   }
-  (turn.combos || []).forEach(c => { if(c.ids.every(x => ids.indexOf(x) >= 0)){ addTo(d, c.eff); notes.push({type: c.good ? 'combo' : 'clash', text: c.note}); } });
+  // 여러 조의 정책이 맞물리면 시너지(보너스 +) 또는 충돌(보너스 −)
+  const syn = []; let bonus = 0;
+  (turn.combos || []).forEach((c, ci) => { if(c.ids.every(x => ids.indexOf(x) >= 0)){ addTo(d, c.eff); bonus += c.bonus || 0; syn.push(ci); notes.push({type: c.good ? 'combo' : 'clash', text: '「' + c.name + '」 ' + c.note}); } });
+  const depts = {}; ids.forEach(x => depts[x.charAt(0)] = 1);
+  const full = Object.keys(depts).length >= 6;
+  if(full){ bonus += FULL_BONUS; }
   // 지연 효과 도착
   g.pending = g.pending.filter(p => { if(p.due === g.t){ addTo(d, p.eff); notes.push({type:'later', text:p.note}); return false; } return true; });
   // 전쟁: 쌓아 둔 국방력이 피해를 좌우
@@ -61,7 +67,8 @@ function playTurn(g, pack, sur){
 
   const delta = {}; for(const k of SKEYS) delta[k] = Math.round((g.st[k] - before[k])*10)/10;
   const log = {t:g.t, year:turn.year, title:turn.title, adopt:adopt, why:pack ? String(pack.why || '') : '', delta:delta, notes:notes,
-               matches: ids.filter(x => turn.real.ids.indexOf(x) >= 0).length, sur:surLog};
+               matches: ids.filter(x => turn.real.ids.indexOf(x) >= 0).length, sur:surLog, syn:syn, bonus:bonus, full:full};
+  g.bonus = (g.bonus || 0) + bonus;
   g.log.push(log);
   g.t++;
   g.hist.push(Object.assign({}, g.st));
@@ -79,10 +86,17 @@ function finishGame(g){
   g.hist[g.hist.length-1] = Object.assign({}, g.st);
 }
 
-/* 점수: 평균 60% + 가장 낮은 지표 40% − 위기 */
+/* 점수: 평균 60% + 가장 낮은 지표 40% − 위기 + 협력 보너스(시너지) */
 function scoreOf(g){
   const v = SKEYS.map(k => g.st[k]);
   const avg = v.reduce((a,b) => a+b, 0) / v.length, min = Math.min.apply(null, v);
-  return Math.round(avg*0.6 + min*0.4 - 5*g.crises.length);
+  return Math.round(avg*0.6 + min*0.4 - 5*g.crises.length + (g.bonus || 0));
 }
 function realMatches(g){ return g.log.reduce((a, l) => a + (l.matches || 0), 0); }
+
+/* 정책이 어느 조와 시너지를 낼 수 있는지(결과 전 힌트: 상대 조 이름만) */
+function synergyPartners(turn, pid){
+  const out = {};
+  (turn.combos || []).forEach(c => { if(c.good && c.ids.indexOf(pid) >= 0) c.ids.forEach(x => { if(x !== pid) out[x.charAt(0)] = 1; }); });
+  return Object.keys(out).map(d => roleById(d).dept);
+}

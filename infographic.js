@@ -23,7 +23,7 @@ function powerBoardHTML(room, turnIdx, myId){
         <span class="pbn">${flagSVG(room, t, 30)}<b>${esc(t.name)}</b></span>
         ${SKEYS.map(k => { const a = pv[k], b = t.st[k], d = Math.round((b - a) * 10) / 10;
           return `<span class="pbc"><span class="pbbar"><i data-from="${a}" data-to="${b}" class="${b < 20 ? 'lo' : ''}" style="width:${a}%"></i></span><span class="pbv"><b class="num" data-from="${Math.round(a)}" data-to="${Math.round(b)}">${Math.round(a)}</b>${d ? `<em class="${d > 0 ? 'up' : 'dn'}">${d > 0 ? '+' : ''}${d}</em>` : ''}</span></span>`; }).join('')}
-        <span class="pbs"><b class="num" data-from="${ps}" data-to="${t.score}">${ps}</b>${t.score - ps ? `<em class="${t.score - ps > 0 ? 'up' : 'dn'}">${t.score - ps > 0 ? '+' : ''}${t.score - ps}</em>` : ''}</span></div>`; }).join('')}
+        <span class="pbs"><b class="num" data-from="${ps}" data-to="${t.score}">${ps}</b>${t.bonus ? `<small class="pbbonus">협력 +${t.bonus}</small>` : ''}${t.score - ps ? `<em class="${t.score - ps > 0 ? 'up' : 'dn'}">${t.score - ps > 0 ? '+' : ''}${t.score - ps}</em>` : ''}</span></div>`; }).join('')}
   </div>`;
 }
 

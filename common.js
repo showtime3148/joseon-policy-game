@@ -35,7 +35,7 @@ function teamCard(room, t, o){
   if(room.phase==='deciding') badge = t.submitted ? '<span class="stamp pop">裁可 상신</span>' : `<span class="waiting">논의 중… 제안 ${t.props}</span>`;
   const sb = room.phase==='deciding' && room.sur && room.sur.id ? `<span class="sbadge ${t.responded?'ok':''}">${t.responded?'돌발 대응 완료':'돌발 대응 중…'}</span>` : '';
   const turn=curTurn(room);
-  const adopted = room.phase==='revealed' && last && last.t===room.turn ? `<div class="chips" style="gap:4px">${last.adopt.length?last.adopt.map(a=>{ const p=policyOf(turn,a.id); return `<span class="cchip ${turn.real.ids.includes(a.id)?'real':''}">${esc(p?p.name:a.id)}</span>`; }).join(''):'<span class="small" style="color:var(--bad)">합의안 없음</span>'}</div>` : '';
+  const adopted = room.phase==='revealed' && last && last.t===room.turn ? `<div class="chips" style="gap:4px">${last.adopt.length?last.adopt.map(a=>{ const p=policyOf(turn,a.id); return `<span class="cchip ${turn.real.ids.includes(a.id)?'real':''}">${esc(p?p.name:a.id)}</span>`; }).join(''):'<span class="small" style="color:var(--bad)">정책 없음</span>'}</div>` : '';
   return `<div class="tc nation ${o.me?'me':''}" style="--nc:${nationColor(room,t.id)}">${room.phase!=='lobby'?`<span class="rk r${r}">${r}</span>`:''}
     <div class="nm">${flagSVG(room,t,28)}<b>${esc(t.name)}</b>${room.phase!=='lobby'?`<span class="sc num">${t.score}</span>`:''}</div>
     ${badge}${sb}${kingdomSVG(t.st,{crisis:last&&last.notes.some(n=>n.type==='crisis')})}
@@ -52,7 +52,7 @@ function policyHTML(turn, p, o){
   o=o||{};
   const d=deptOf(p.id);
   return `<button type="button" class="pol ${o.state||''}" data-pol="${p.id}" aria-haspopup="dialog">
-    <span class="ph"><i class="r-${d.id}">${d.icon}</i>${esc(d.dept)}${o.state==='prop'?'<em>제안됨</em>':o.state==='adopt'?'<em>합의안</em>':''}</span>
+    <span class="ph"><i class="r-${d.id}">${d.icon}</i>${esc(d.dept)}${o.state==='prop'?'<em>제안됨</em>':o.state==='adopt'?'<em>✓ 우리 조 선택</em>':''}</span>
     <b>${esc(p.name)}</b><span class="ds">${esc(p.desc)}</span>
     <span class="tags">${tagsOf(p.eff)}${p.later?'<span class="tag">몇 해 뒤 효과</span>':''}</span>
     ${o.by?`<span class="by">제안: ${esc(o.by)}</span>`:''}</button>`;
@@ -87,4 +87,26 @@ function surpriseCardHTML(S, o){
     <p>${esc(S.text)}</p>
     <div class="sxo">${S.options.map(op=>`<${o.pick?'button type="button" data-sresp="'+op.id+'"':'div'} class="sxopt ${o.chosen===op.id?'on':''}"><b>${esc(op.label)}</b><span>${esc(op.desc)}</span><span class="tags">${tagsOf(op.eff)}</span></${o.pick?'button':'div'}>`).join('')}</div>
     ${o.foot||''}</div>`;
+}
+
+/* 시너지 도감: 이번 사건의 시너지·충돌과 어느 나라가 이뤘는지 */
+function synergyHTML(room, turnIdx, myId){
+  const turn = ERA.turns[turnIdx];
+  const got = {}; room.teams.forEach(t => { const l = t.log.find(x => x.t === turnIdx); (l && l.syn || []).forEach(i => (got[i] = got[i] || []).push(t)); });
+  const card = (c, i) => { const who = got[i] || [], mine = who.some(t => t.id === myId);
+    return `<div class="syn ${c.good ? 'good' : 'bad'} ${who.length ? 'hit' : ''} ${mine ? 'mine' : ''}">
+      <div class="synh"><b>${c.good ? '🔗 ' : '⚡ '}${esc(c.name)}</b><span class="synb ${c.bonus > 0 ? 'up' : 'dn'}">${c.bonus > 0 ? '+' : ''}${c.bonus}점</span></div>
+      <div class="synp">${c.ids.map(id => { const d = deptOf(id); return `<span><i class="dico r-${d.id}">${d.icon}</i>${esc(policyOf(turn, id).name)}</span>`; }).join('<em>+</em>')}</div>
+      <p>${esc(c.note)}</p>
+      <div class="chips">${who.map(t => `<span class="chip drop ${t.id === myId ? 'me' : ''}" style="border-color:${nationColor(room, t.id)}">${esc(t.name)}</span>`).join('') || '<span class="small muted">이룬 나라 없음</span>'}</div></div>`; };
+  const goods = turn.combos.map((c, i) => [c, i]).filter(([c]) => c.good), bads = turn.combos.map((c, i) => [c, i]).filter(([c]) => !c.good);
+  return `<div class="synwrap"><div class="syncol"><h4>시너지 (협력 보너스)</h4>${goods.map(([c, i]) => card(c, i)).join('')}</div>
+    <div class="syncol"><h4>충돌 (감점)</h4>${bads.map(([c, i]) => card(c, i)).join('')}</div></div>`;
+}
+/* 우리 나라의 이번 협력 성적표 */
+function myBonusHTML(turn, l){
+  if (!l) return '';
+  const rows = (l.syn || []).map(i => turn.combos[i]).map(c => `<div class="mbr ${c.good ? 'good' : 'bad'}"><b>${c.good ? '🔗' : '⚡'} ${esc(c.name)}</b><span>${c.bonus > 0 ? '+' : ''}${c.bonus}</span></div>`);
+  if (l.full) rows.push(`<div class="mbr good"><b>🏛 6조 전원 참여</b><span>+${FULL_BONUS}</span></div>`);
+  return `<div class="mybonus"><div class="mbh">협력 보너스 <b class="${l.bonus >= 0 ? 'up' : 'dn'}">${l.bonus > 0 ? '+' : ''}${l.bonus || 0}점</b></div>${rows.join('') || '<p class="small muted" style="margin:0">이번에는 맞물린 정책이 없었습니다. 아래 시너지 도감을 보고 다음 사건에서 다른 조와 손발을 맞춰 보세요.</p>'}</div>`;
 }

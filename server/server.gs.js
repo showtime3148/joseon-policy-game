@@ -6,7 +6,7 @@
 const ROOM_TTL = 21600; // 6시간
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const TOTAL = 7;
-const LOG_HEAD = ['기록 시각','방','학급','사건 번호','연도','사건','모둠','모둠원(역할)','시행 정책','실제 역사와 같은 정책 수','합의안 근거(영의정)','돌발 이벤트','돌발 대응','국고','민심','왕권','국방','민생','문화','점수'];
+const LOG_HEAD = ['기록 시각','방','학급','사건 번호','연도','사건','모둠','모둠원(역할)','시행 정책','시너지·충돌','협력 보너스','실제 역사와 같은 정책 수','합의안 근거(영의정)','돌발 이벤트','돌발 대응','국고','민심','왕권','국방','민생','문화','점수'];
 const PROP_HEAD = ['기록 시각','방','학급','사건 번호','사건','모둠','제안자','역할','제안 정책','채택','제안 근거','학생이 쓴 비슷한 현대 정책','참고: 현대 정책 해설','실제 역사에서 시행'];
 const FINAL_HEAD = ['제출 시각','방','학급','모둠','이름','역할','모둠 점수','순위','실제 역사와 같은 정책 수','국고','민심','왕권','국방','민생','문화','위기','성찰1: 내 조의 결정과 실제 역사','성찰2: 조선 정책과 현대 정책 비교','성찰3: 의정부 합의 과정'];
 
@@ -86,7 +86,7 @@ function publicRoom(r) {
       return { id: t.id, name: t.name, members: memberList(t).map(m => ({ id: m.id, name: m.name, roles: m.roles, final: !!m.final })),
         submitted: !!t.sub, props: t.np || 0, responded: !!t.sresp,
         st: g.st, hist: g.hist, crises: g.crises, log: g.log, done: g.done, lateNotes: g.lateNotes || [],
-        score: scoreOf(g), matches: realMatches(g) };
+        score: scoreOf(g), matches: realMatches(g), bonus: g.bonus || 0 };
     })
   };
 }
@@ -197,13 +197,15 @@ function handle(d) {
         const t = r.teams[id], g = t.game;
         if (g.t !== r.turn) return;
         const props = getProps(r, t);
-        const pack = t.sub ? { why: t.sub.why, adopt: t.sub.ids.filter(x => props[x]).map(x => ({ id: x, by: props[x].name, role: props[x].role, why: props[x].why, modern: props[x].modern })) } : null;
+        const mk = x => ({ id: x, by: props[x].name, role: props[x].role, why: props[x].why, modern: props[x].modern });
+        const pack = t.sub ? { why: t.sub.why, adopt: t.sub.ids.filter(x => props[x]).map(mk) }
+          : Object.keys(props).length ? { why: '', unsent: true, adopt: Object.keys(props).map(mk) } : null;
         const sur = r.sur && r.sur.fired ? { id: r.sur.id, resp: t.sresp || null } : null;
         const l = playTurn(g, pack && pack.adopt.length ? pack : null, sur);
         const S = sur ? surpriseById(sur.id) : null, so = S && S.options.filter(x => x.id === sur.resp)[0];
         const adopted = l.adopt.map(a => a.id);
         logRows.push([now, r.code, r.cls, r.turn + 1, turn.year, turn.title, t.name, membersText(t),
-          l.adopt.map(a => policyOf(turn, a.id).name).join(', ') || '(합의안 없음)', l.matches, l.why, S ? S.title : '', S ? (so ? so.label : '대응 못 함') : '',
+          l.adopt.map(a => policyOf(turn, a.id).name).join(', ') || '(합의안 없음)', (l.syn || []).map(i => turn.combos[i].name).join(', '), l.bonus || 0, l.matches, l.why, S ? S.title : '', S ? (so ? so.label : '대응 못 함') : '',
           g.st.tr, g.st.pp, g.st.cr, g.st.df, g.st.lv, g.st.cu, scoreOf(g)]);
         Object.keys(props).forEach(pid => {
           const p = props[pid], pol = policyOf(turn, pid);
@@ -249,29 +251,29 @@ function handle(d) {
       if (!cur) return { ok: true };
       if (cur.by !== m.id && !canDecide(t, m)) return { ok: false, error: '다른 사람의 제안은 영의정만 거둘 수 있습니다.' };
       delete P[pol.id]; setProps(r, t, P);
-      if (t.sub) t.sub.ids = t.sub.ids.filter(x => x !== pol.id);
+      t.sub = null;   // 결정이 바뀌면 영의정이 다시 상신
       putRoom(r, false); return { ok: true };
     }
     if (!canPropose(t, m, pol.id)) return { ok: false, error: deptOf(pol.id).dept + ' 정책은 ' + josa(deptOf(pol.id).name, '이가') + ' 제안합니다.' };
-    if (cur && cur.by !== m.id) return { ok: false, error: '이미 ' + cur.name + ' 학생이 제안한 정책입니다.' };
+    if (cur && cur.by !== m.id && !canDecide(t, m)) return { ok: false, error: '이미 ' + cur.name + ' 학생이 고른 정책입니다.' };
     const why = txt(d.why, 250), modern = txt(d.modern, 80);
     if (why.length < 15) return { ok: false, error: '제안 근거를 15자 이상 쓰세요.' };
     if (modern.length < 2) return { ok: false, error: '비슷한 현대 정책을 쓰세요.' };
     const role = m.roles.indexOf(pol.id.charAt(0)) >= 0 ? deptOf(pol.id).name : '영의정(대리)';
+    // 한 조는 정책 하나만: 같은 조의 다른 선택은 바꾼다
+    Object.keys(P).forEach(x => { if (x !== pol.id && x.charAt(0) === pol.id.charAt(0)) delete P[x]; });
     P[pol.id] = { by: m.id, name: m.name, role: role, why: why, modern: modern }; setProps(r, t, P);
+    t.sub = null;
     putRoom(r, false); return { ok: true };
   }
   if (d.action === 'submit') {
     if (r.phase !== 'deciding' || t.game.t !== r.turn) return { ok: false, error: '지금은 합의안을 올릴 때가 아닙니다.' };
     if (Number(d.turn) !== r.turn) return { ok: false, error: '이미 지나간 사건입니다.' };
     if (!canDecide(t, m)) return { ok: false, error: '합의안은 영의정이 올립니다.' };
-    const ids = (Array.isArray(d.adopt) ? d.adopt : []).filter((x, i, a) => a.indexOf(x) === i);
-    if (!ids.length) return { ok: false, error: '시행할 정책을 하나 이상 고르세요.' };
-    if (ids.length > MAX_ADOPT) return { ok: false, error: '한 번에 ' + MAX_ADOPT + '개까지 시행할 수 있습니다.' };
-    const P = getProps(r, t), missing = ids.filter(x => !P[x]);
-    if (missing.length) return { ok: false, error: '판서가 제안한 정책만 시행할 수 있습니다.' };
+    const P = getProps(r, t), ids = Object.keys(P);
+    if (!ids.length) return { ok: false, error: '정책을 고른 조가 아직 없습니다.' };
     const why = txt(d.why, 400);
-    if (why.length < 30) return { ok: false, error: '합의안 근거를 30자 이상 쓰세요.' };
+    if (why.length < 30) return { ok: false, error: '의정부 결정 근거를 30자 이상 쓰세요.' };
     t.sub = { ids: ids, why: why, by: m.name, at: Date.now() };
     putRoom(r, false); return { ok: true };
   }

@@ -3,10 +3,10 @@ const REDUCE = (() => { try { return matchMedia('(prefers-reduced-motion: reduce
 let stageTimers = [];
 
 function prevStats(t){ return t.hist.length >= 2 ? t.hist[t.hist.length - 2] : t.st; }
-function prevScore(t, turnIdx){
+function prevScore(t, turnIdx){ // 직전 점수(이번 사건의 보너스 제외)
   const l = t.log.find(x => x.t === turnIdx);
   if (!l) return t.score;
-  return scoreOf({st: prevStats(t), crises: t.crises.filter(c => c.year !== l.year)});
+  return scoreOf({st: prevStats(t), crises: t.crises.filter(c => c.year !== l.year), bonus: (t.bonus || 0) - (l.bonus || 0)});
 }
 
 /* 단계 실행: [data-at] 요소가 지정한 시간(ms)에 나타나고 data-fx 효과를 실행 */
@@ -114,7 +114,7 @@ function distAnimHTML(room, turnIdx, myId){
   room.teams.forEach(t => { const l = t.log.find(x => x.t === turnIdx); if (!l) return; if (!l.adopt.length) none.push(t); l.adopt.forEach(a => by[a.id] && by[a.id].push(t)); });
   return `<div class="dist pdist">${turn.policies.map(p => { const d = deptOf(p.id); return `<div class="dc" data-real="${turn.real.ids.includes(p.id) ? 1 : 0}"><div class="row between"><h4><i class="dico r-${d.id}">${d.icon}</i> ${esc(p.name)}</h4><span class="cnt num" data-to="${by[p.id].length}">0</span></div>
     <div class="chips">${by[p.id].map(t => `<span class="chip ${t.id === myId ? 'me' : ''}">${esc(t.name)}</span>`).join('') || '<span class="small muted">없음</span>'}</div></div>`; }).join('')}</div>
-    ${none.length ? `<p class="small muted" style="margin:6px 0 0">합의안을 올리지 못한 의정부: ${none.map(t => esc(t.name)).join(', ')}</p>` : ''}`;
+    ${none.length ? `<p class="small muted" style="margin:6px 0 0">정책을 내지 못한 의정부: ${none.map(t => esc(t.name)).join(', ')}</p>` : ''}`;
 }
 function realFlipHTML(turn, n, at, manual){
   const names = turn.real.ids.map(id => policyOf(turn, id).name);

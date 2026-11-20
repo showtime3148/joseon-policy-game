@@ -91,11 +91,11 @@ function surAlert(){
     <div class="mbody surpop">${surpriseCardHTML(S,{pick:uCanDecide(), chosen:room.mySresp, big:true})}</div><div class="mf"><button class="btn" data-close>닫고 회의 계속하기</button></div>`);
 }
 function othersHTML(){ return '<div class="teams">'+room.teams.map(t=>teamCard(room,t,{me:t.id===L.teamId})).join('')+'</div>'; }
-function subStatus(){ const n=room.teams.filter(t=>t.submitted).length; return `<span class="pill ${n===room.teams.length?'good':'navy'}">합의안 상신 ${n}/${room.teams.length} 의정부</span>`; }
+function subStatus(){ const n=room.teams.filter(t=>t.submitted).length; return `<span class="pill ${n===room.teams.length?'good':'navy'}">결정 상신 ${n}/${room.teams.length} 의정부</span>`; }
 function membersHTML(){
   const t=me(), vac=ROLES.filter(r=>r.id!=='yeong'&&!uHasRole(t,r.id));
   return `<div class="stack" style="gap:6px">${t.members.map(m=>`<div class="mrow2 ${m.id===L.memberId?'me':''}">${memberLine(m)}</div>`).join('')}</div>
-    ${!uHasRole(t,'yeong')?'<p class="note" style="margin:8px 0 0">영의정이 없습니다. 합의안은 모둠원 누구나 올릴 수 있습니다.</p>':''}
+    ${!uHasRole(t,'yeong')?'<p class="note" style="margin:8px 0 0">영의정이 없습니다. 의정부 결정은 모둠원 누구나 상신할 수 있습니다.</p>':''}
     ${vac.length?`<p class="small muted" style="margin:8px 0 0">판서가 없는 조: ${vac.map(r=>r.dept).join(', ')} → 영의정이 대신 제안합니다.</p>`:''}`;
 }
 function rolePickHTML(sel, taken){
@@ -135,9 +135,10 @@ function vLobby(){
         <div class="mykd">${kingdomSVG(t.st)}</div></div>
       <div class="card stack"><h3 style="font-size:18px">회의 방식</h3>
         <ol style="margin:0; padding-left:20px; line-height:1.9">
-          <li>사건이 열리면 각 판서는 <b>자기 조의 정책</b>을 살펴보고 필요한 정책을 <b>제안</b>합니다. 제안할 때 <b>근거</b>와 <b>비슷한 현대 정책</b>을 씁니다.</li>
-          <li>영의정은 제안된 정책 가운데 <b>최대 ${MAX_ADOPT}개</b>를 묶어 합의안을 만들고, 근거를 써서 <b>상신</b>합니다.</li>
-          <li>정책끼리 서로 돕기도 하고 부딪히기도 합니다. 몇 해 뒤에 나타나는 효과도 있습니다.</li>
+          <li>사건이 열리면 각 판서는 <b>자기 조의 정책 3개 중 하나</b>를 고릅니다. 고를 때 <b>근거</b>와 <b>비슷한 현대 정책</b>을 씁니다.</li>
+          <li>여러 조의 정책이 맞물리면 <b>시너지</b>가 나서 <b>협력 보너스 점수</b>를 받고, 서로 부딪히면 점수를 잃습니다. 🔗 표시를 보고 다른 조와 상의하세요.</li>
+          <li>영의정은 6조의 결정을 살피고 근거를 써서 <b>상신</b>합니다. 6조가 모두 정책을 내면 전원 참여 보너스가 있습니다.</li>
+          <li>몇 해 뒤에 나타나는 효과와 회의 중 갑자기 일어나는 <b>돌발 이벤트</b>도 있습니다.</li>
           <li>결과가 공개되면 실제 역사에서 시행한 정책과, 우리가 쓴 현대 정책에 대한 해설을 비교합니다.</li></ol></div>
       <div class="card stack"><h3 style="font-size:18px">내 역할 바꾸기 <span class="small muted" style="font-family:var(--body)">첫 사건 전까지</span></h3>
         ${rolePickHTML(m.roles, taken)}<div class="row"><button class="btn jade" data-act="roles">역할 저장</button><span class="small" id="rs"></span></div></div>
@@ -149,7 +150,7 @@ function vLobby(){
 /* ---------- 결정 ---------- */
 function draft(){
   if(!L.draft || L.draft.turn!==room.turn || L.draft.code!==room.code) L.draft={code:room.code, turn:room.turn, adopt:[], why:''};
-  L.draft.adopt=L.draft.adopt.filter(id=>props()[id]);
+  L.draft.adopt=Object.keys(props());   // 각 조가 고른 정책 = 의정부의 결정
   return L.draft;
 }
 function headHTML(){
@@ -158,25 +159,28 @@ function headHTML(){
     <div class="card evscene">${eventScene(turn.art, turn.war)}<div><div class="yr">${turn.year}년 · ${esc(turn.reign)} · 사건 ${room.turn+1}/${ERA.turns.length}</div><h2>${esc(turn.title)}</h2><p>${esc(turn.text)}</p>${turn.war?'<p style="margin-top:8px"><span class="pill bad">전쟁 · 쌓아 둔 국방력이 피해를 좌우합니다</span></p>':''}</div></div>
     <div id="surbox" style="margin-top:12px">${surBoxHTML()}</div>`;
 }
-function polState(pid){ const d=L.draft, pr=props()[pid]; if(d&&d.adopt.includes(pid)) return 'adopt'; return pr?'prop':''; }
+function polState(pid){ return props()[pid]?'adopt':''; }
+function chosenOf(dept){ return Object.keys(props()).find(x=>x.charAt(0)===dept); }
 function polsHTML(){
   const turn=curTurn(room), P=props();
   const groups=ROLES.filter(r=>r.id!=='yeong').map(r=>({r, list:turn.policies.filter(p=>p.id.charAt(0)===r.id)})).filter(g=>g.list.length);
-  return groups.map(g=>`<div class="dept ${uCanPropose(g.list[0].id)?'mine':''}"><div class="dh"><i class="r-${g.r.id}">${g.r.icon}</i><b>${g.r.dept}</b><span class="small muted">${esc(g.r.duty)}</span>${uCanPropose(g.list[0].id)?'<span class="pill jade">내가 제안</span>':''}</div>
+  return groups.map(g=>`<div class="dept ${uCanPropose(g.list[0].id)?'mine':''}"><div class="dh"><i class="r-${g.r.id}">${g.r.icon}</i><b>${g.r.dept}</b><span class="small muted">${esc(g.r.duty)}</span>${uCanPropose(g.list[0].id)?'<span class="pill jade">내가 고름</span>':''}${chosenOf(g.r.id)?'':'<span class="pill">아직 고르지 않음</span>'}</div>
     <div class="pols">${g.list.map(p=>policyHTML(turn,p,{state:polState(p.id), by:P[p.id]&&P[p.id].name})).join('')}</div></div>`).join('');
 }
 function propListHTML(){
   const turn=curTurn(room), P=props(), ids=Object.keys(P);
-  if(!ids.length) return '<p class="muted small" style="margin:0">아직 제안된 정책이 없습니다. 판서는 자기 조의 정책을 눌러 제안하세요.</p>';
+  if(!ids.length) return '<p class="muted small" style="margin:0">아직 고른 조가 없습니다. 판서는 자기 조의 정책 3개 중 하나를 눌러 고르세요.</p>';
   return ids.map(id=>{ const p=policyOf(turn,id), pr=P[id]; return `<div class="prop"><div class="row between"><b>${esc(p.name)}</b><span class="small muted">${esc(pr.name)} · ${esc(pr.role)}</span></div>
     <p>${esc(pr.why)}</p><p class="small"><b>비슷한 현대 정책</b> ${esc(pr.modern)}</p></div>`; }).join('');
 }
 function packHTML(){
-  if(!uCanDecide()) return '<p class="small muted" style="margin:0">영의정이 제안을 모아 합의안을 만들고 있습니다. 의견이 있으면 직접 말로 전하세요.</p>';
-  const turn=curTurn(room), d=L.draft;
-  return `<p class="small muted" style="margin:0">제안된 정책을 눌러 합의안에 넣거나 뺄 수 있습니다. 최대 ${MAX_ADOPT}개.</p>
-    <div class="packlist">${d.adopt.length?d.adopt.map(id=>`<button type="button" class="pk" data-unadopt="${id}">${esc(policyOf(turn,id).name)} ✕</button>`).join(''):'<span class="small muted">아직 고른 정책이 없습니다.</span>'}</div>
-    <div class="small"><b>${d.adopt.length}/${MAX_ADOPT}</b> 정책 · 예상 방향 ${effList(packEffect(turn,d.adopt))||'-'}</div>`;
+  const turn=curTurn(room), P=props();
+  const rows=ROLES.filter(r=>r.id!=='yeong').map(r=>{ const id=chosenOf(r.id), p=id&&policyOf(turn,id), hint=id?synergyPartners(turn,id):[];
+    return `<div class="slot ${id?'on':''}"><i class="r-${r.id}">${r.icon}</i><b>${r.dept}</b><span>${id?esc(p.name):'보류(아직 고르지 않음)'}</span>${id?`<em class="small muted">${esc(P[id].name)}</em>`:''}${hint.length?`<span class="hintsyn" title="이 정책은 이 조들과 손발이 맞으면 시너지가 날 수 있습니다">🔗 ${hint.join('·')}</span>`:''}</div>`; }).join('');
+  const n=Object.keys(P).length;
+  return `<div class="slots">${rows}</div>
+    <div class="small" style="margin-top:6px"><b>${n}/6</b> 조 결정${n===6?' · <b style="color:var(--jade)">6조 전원 참여 보너스 +'+FULL_BONUS+'</b>':''} · 예상 방향 ${effList(packEffect(turn,Object.keys(P)))||'-'}</div>
+    <p class="hint" style="margin:4px 0 0">🔗는 그 정책과 시너지가 날 수 있는 조입니다. 어떤 정책끼리 맞물리는지는 결과 공개 때 드러납니다. 시너지가 나면 <b>협력 보너스 점수</b>를 받고, 서로 부딪히면 점수를 잃습니다.</p>`;
 }
 function vDecide(){
   const t=me(), turn=curTurn(room);
@@ -184,10 +188,10 @@ function vDecide(){
     const s=room.mySub;
     $app.innerHTML=`${headHTML()}<div class="play" style="margin-top:16px"><div class="stack">
       <div class="card stack" style="text-align:center; align-items:center"><span class="stamp pop" style="position:static; transform:rotate(-6deg); font-size:26px; padding:6px 18px">裁可</span>
-        <h2 style="font-size:22px">합의안을 상신했습니다</h2>
+        <h2 style="font-size:22px">의정부의 결정을 상신했습니다</h2>
         <div class="chips" style="justify-content:center">${s.adopt.map(a=>`<span class="cchip">${esc(policyOf(turn,a.id).name)}</span>`).join('')}</div>
-        <p class="small muted" style="margin:0; max-width:60ch">${esc(s.why)}</p><p class="small muted" style="margin:0">상신: ${esc(s.by)} · 선생님이 결과를 공개할 때까지 고칠 수 있습니다.</p>
-        ${uCanDecide()?'<button class="btn" data-act="edit">합의안 고치기</button>':''}</div>
+        <p class="small muted" style="margin:0; max-width:60ch">${esc(s.why)}</p><p class="small muted" style="margin:0">상신: ${esc(s.by)} · 판서가 정책을 바꾸면 영의정이 다시 상신해야 합니다.</p>
+        ${uCanDecide()?'<button class="btn" data-act="edit">결정 고치기</button>':''}</div>
       <div class="card stack"><h3 style="font-size:17px">우리 의정부의 제안</h3><div id="plist">${propListHTML()}</div></div>
       <div class="card"><h3 style="font-size:17px; margin-bottom:10px">다른 의정부</h3><div id="live">${othersHTML()}</div></div></div>
       <div class="side"><div class="card">${kingdomSVG(t.st)}<div style="margin-top:10px">${gaugesHTML(t.st)}</div></div><div class="card"><h3 style="font-size:16px;margin-bottom:8px">우리 의정부</h3><div id="mem">${membersHTML()}</div></div></div></div>`;
@@ -195,25 +199,26 @@ function vDecide(){
   }
   const d=draft();
   $app.innerHTML=`${headHTML()}
-  <div class="card stack" style="margin-top:14px"><div class="row between"><h3 style="font-size:19px">6조의 정책</h3><span class="small muted">정책을 누르면 자세히 보고 제안할 수 있습니다 · ▲▼는 즉시 효과의 방향만 보여 줍니다</span></div>
+  <div class="card stack" style="margin-top:14px"><div class="row between"><h3 style="font-size:19px">6조의 정책</h3><span class="small muted">각 조는 정책 3개 중 하나를 고릅니다 · 정책을 누르면 자세히 볼 수 있습니다 · ▲▼는 즉시 효과의 방향</span></div>
     <div id="pols">${polsHTML()}</div></div>
   <div class="play" style="margin-top:14px"><div class="stack">
-    <div class="card stack"><h3 style="font-size:17px">우리 의정부의 제안</h3><div id="plist">${propListHTML()}</div></div>
-    ${uCanDecide()?`<form class="card stack yeong" id="act" novalidate><h3 style="font-size:19px"><i class="r-yeong rico">領</i> 영의정의 합의안</h3>
+    ${uCanDecide()?`<form class="card stack yeong" id="act" novalidate><h3 style="font-size:19px"><i class="r-yeong rico">領</i> 6조의 결정 · 영의정 상신</h3>
       <div id="pack">${packHTML()}</div>
-      <label class="f" for="why">합의안 근거 <span class="hint">이 정책들을 왜 함께 시행하는지, 무엇을 얻고 무엇을 감수하는지 (${MIN_WHY}자 이상)</span><textarea id="why" maxlength="400">${esc(d.why)}</textarea><span class="hint" id="cnt">${d.why.trim().length}자</span></label>
-      <div class="err" id="err"></div><button class="btn primary big" type="submit">합의안 상신</button></form>`
-      :`<div class="card stack"><h3 style="font-size:17px">영의정의 합의안</h3><div id="pack">${packHTML()}</div></div>`}
+      <label class="f" for="why">의정부 결정 근거 <span class="hint">6조의 정책이 어떻게 서로 맞물리는지, 무엇을 얻고 무엇을 감수하는지 (${MIN_WHY}자 이상)</span><textarea id="why" maxlength="400">${esc(d.why)}</textarea><span class="hint" id="cnt">${d.why.trim().length}자</span></label>
+      <div class="err" id="err"></div><button class="btn primary big" type="submit">의정부 결정 상신</button></form>`
+      :`<div class="card stack"><h3 style="font-size:17px">6조의 결정</h3><div id="pack">${packHTML()}</div><p class="small muted" style="margin:0">모든 조가 고르면 영의정이 상신합니다.</p></div>`}
+    <div class="card stack"><h3 style="font-size:17px">각 조가 고른 정책과 근거</h3><div id="plist">${propListHTML()}</div></div>
     <div class="card"><h3 style="font-size:17px; margin-bottom:10px">다른 의정부</h3><div id="live">${othersHTML()}</div></div></div>
   <div class="side">
-    <div class="card"><h3 style="font-size:16px; margin-bottom:8px">우리 나라</h3>${kingdomSVG(t.st)}<div style="margin-top:10px" id="gg">${gaugesHTML(t.st, uCanDecide()?packEffect(turn,d.adopt):null)}</div>
-      ${uCanDecide()?'<p class="hint" style="margin:8px 0 0">빗금과 ▲▼는 합의안의 즉시 효과 방향입니다(크기·조합 효과·지연 효과는 숨김).</p>':''}</div>
+    <div class="card"><h3 style="font-size:16px; margin-bottom:8px">우리 나라</h3>${kingdomSVG(t.st)}<div style="margin-top:10px" id="gg">${gaugesHTML(t.st, uCanDecide()?packEffect(turn,Object.keys(props())):null)}</div>
+      ${uCanDecide()?'<p class="hint" style="margin:8px 0 0">빗금과 ▲▼는 6조 결정의 즉시 효과 방향입니다(크기·시너지·지연 효과는 숨김).</p>':''}</div>
     <div class="card"><h3 style="font-size:16px;margin-bottom:8px">우리 의정부</h3><div id="mem">${membersHTML()}</div></div></div></div>`;
 }
-function updPreview(){ const gg=document.getElementById('gg'); if(gg&&uCanDecide()&&L.draft) gg.innerHTML=gaugesHTML(me().st, packEffect(curTurn(room),L.draft.adopt)); }
+function updPreview(){ const gg=document.getElementById('gg'); if(gg&&uCanDecide()) gg.innerHTML=gaugesHTML(me().st, packEffect(curTurn(room),Object.keys(props()))); }
 function polModal(pid){
   const turn=curTurn(room), p=policyOf(turn,pid), d=deptOf(pid), pr=props()[pid], m=mine();
-  const mineProp=pr&&pr.by===m.id, can=uCanPropose(pid)&&(!pr||mineProp)&&!room.mySub, dec=uCanDecide()&&!room.mySub;
+  const mineProp=pr&&pr.by===m.id, can=uCanPropose(pid)&&(!pr||mineProp), dec=uCanDecide();
+  const other=chosenOf(pid.charAt(0)), partners=synergyPartners(turn,pid);
   let body='', foot='';
   if(pr && !mineProp) body=`<div class="sec2"><h4>${esc(pr.name)} 학생(${esc(pr.role)})의 제안</h4><p>${esc(pr.why)}</p><p><b>비슷한 현대 정책</b> ${esc(pr.modern)}</p></div>`;
   if(can){
@@ -221,15 +226,17 @@ function polModal(pid){
       <label class="f" for="pwhy">제안 근거 <span class="hint">이 사건에 왜 이 정책이 필요한지, 부작용은 무엇인지 (${MIN_PWHY}자 이상)</span><textarea id="pwhy" maxlength="250" style="min-height:90px">${esc(pr?pr.why:(L.pd&&L.pd[pid]&&L.pd[pid].why)||'')}</textarea></label>
       <label class="f" for="pmod">비슷한 현대 정책 <span class="hint">오늘날의 어떤 정책·제도와 닮았나요? 통합사회에서 배운 개념을 떠올려 보세요</span><input type="text" id="pmod" maxlength="80" value="${esc(pr?pr.modern:(L.pd&&L.pd[pid]&&L.pd[pid].modern)||'')}" placeholder="예: 누진세, 규제 완화, 국민 청원"></label>
       <div class="err" id="perr"></div></form>`;
-    foot=(mineProp?'<button class="btn" data-unprop="'+pid+'">제안 거두기</button>':'<button class="btn" data-close>닫기</button>')+`<button class="btn primary" data-prop="${pid}">${mineProp?'제안 고치기':'이 정책 제안하기'}</button>`;
+    if(other&&other!==pid) body=`<p class="note" style="margin:0 0 8px">지금 ${esc(d.dept)}는 「${esc(policyOf(turn,other).name)}」을(를) 골랐습니다. 이 정책으로 정하면 바뀝니다.</p>`+body;
+    foot=(mineProp?'<button class="btn" data-unprop="'+pid+'">선택 취소(보류)</button>':'<button class="btn" data-close>닫기</button>')+`<button class="btn primary" data-prop="${pid}">${mineProp?'근거 고치기':'우리 조 정책으로 정하기'}</button>`;
   } else {
-    if(!pr) body+=`<p class="note" style="margin:0">${room.mySub?'합의안이 이미 상신되었습니다.':esc(josa(d.name,'이가'))+' 제안할 수 있는 정책입니다.'+(uHasRole(me(),d.id)?'':' 판서가 없으면 영의정이 대신 제안합니다.')}</p>`;
+    if(!pr) body+=`<p class="note" style="margin:0">${esc(josa(d.name,'이가'))+' 고르는 정책입니다.'+(uHasRole(me(),d.id)?' 의견이 있으면 말로 전하세요.':' 판서가 없으면 영의정이 대신 고릅니다.')}</p>`;
     foot='<button class="btn" data-close>닫기</button>';
   }
-  if(dec && pr){ const inP=L.draft.adopt.includes(pid); foot=(pr&&!mineProp?`<button class="btn" data-unprop="${pid}" style="margin-right:auto">제안 돌려보내기</button>`:'')+foot.replace('<button class="btn" data-close>닫기</button>','')+`<button class="btn ${inP?'':'jade'}" data-adopt="${pid}">${inP?'합의안에서 빼기':'합의안에 넣기'}</button>`; }
+  if(dec && pr && !mineProp) foot=`<button class="btn" data-unprop="${pid}" style="margin-right:auto">다시 생각해 보라고 돌려보내기</button>`+foot;
   openModal(`<div class="mh"><div><small><i class="dico r-${d.id}">${d.icon}</i> ${esc(d.dept)} 정책</small><h2>${esc(p.name)}</h2></div><button class="x" data-close aria-label="닫기">✕</button></div>
     <div class="mbody"><div class="sec2"><h4>어떤 정책인가요</h4><p>${esc(p.desc)}</p></div>
-      <div class="sec2"><h4>예상되는 즉시 효과</h4><div class="tags">${effList(p.eff)}${p.later?'<span class="tag">몇 해 뒤 추가 효과 있음</span>':''}</div><p class="hint" style="margin-top:4px">방향만 공개됩니다. 다른 정책과 함께 시행하면 효과가 커지거나 부딪힐 수 있습니다.</p></div>
+      <div class="sec2"><h4>예상되는 즉시 효과</h4><div class="tags">${effList(p.eff)}${p.later?'<span class="tag">몇 해 뒤 추가 효과 있음</span>':''}</div><p class="hint" style="margin-top:4px">방향만 공개됩니다.</p></div>
+      ${partners.length?`<div class="sec2"><h4>🔗 시너지 가능성</h4><p>이 정책은 <b>${partners.map(esc).join('·')}</b>의 정책과 손발이 맞으면 시너지가 날 수 있습니다. 해당 조의 판서와 상의해 보세요.</p></div>`:''}
       ${body}</div><div class="mf">${foot}</div>`);
 }
 
@@ -243,7 +250,7 @@ function vReveal(){
     ${l.adopt.map((a,i)=>modernHTML(turn,a,{at:at+i*300})).join('')}</div>` : '';
   const tRank=at+300*(l?l.adopt.length:0)+600, tDist=tRank+3600, tReal=tDist+1500;
   const rec = l ? (l.adopt.length ? `${turn.year}년(${esc(turn.reign)}), 「${esc(turn.title)}」에 대하여 ${esc(t.name)} 의정부는 <b>${l.adopt.map(a=>esc(policyOf(turn,a.id).name)).join(', ')}</b>을(를) 함께 시행하였다.`
-    : `${turn.year}년, 「${esc(turn.title)}」에 대하여 ${esc(t.name)} 의정부는 끝내 <b>합의안을 올리지 못하였다</b>.`) : '';
+    : `${turn.year}년, 「${esc(turn.title)}」에 대하여 ${esc(t.name)} 의정부는 끝내 <b>아무 정책도 내지 못하였다</b>.`) : '';
   $app.innerHTML=`<div class="stack" id="rv"><button class="skip" data-act="skip">건너뛰기 ▶▶</button>
     <div class="card stack"><div class="row between"><div class="eyebrow">${turn.year}년 실록</div><span class="pill navy" data-at="${tRank}">현재 ${r}위 · ${t.score}점</span></div>
       ${l?`<div class="rec" data-at="0" data-fx="type">${rec}</div>
@@ -253,6 +260,7 @@ function vReveal(){
         <div class="kgrid"><div class="kswap" data-at="2300" data-fx="swap"><div class="k-old">${kingdomSVG(prev)}</div><div class="k-new">${kingdomSVG(t.st)}</div></div>
         <div data-at="2300" data-fx="bars">${gaugesFromTo(prev, t.st)}</div></div></div>
       <div class="side"><div class="card"><h3 style="font-size:16px; margin-bottom:10px">순위</h3><div data-at="${tRank}" data-fx="rank">${lbAnimHTML(room,t.id,room.turn)}</div></div></div></div>
+    <div class="card stack" data-at="${at}"><h3 style="font-size:18px">6조의 협력 성적</h3>${myBonusHTML(turn, l)}${synergyHTML(room, room.turn, t.id)}</div>
     <div class="card">${infographicHTML(room, room.turn, t.id, {at:tRank+400})}</div>
     ${mods}
     <div class="card stack"><h3 style="font-size:18px">의정부들의 선택과 실제 역사</h3>
@@ -317,13 +325,13 @@ document.addEventListener('submit', e=>{
   }
   if(f.id==='act'){
     const d=L.draft; d.why=v('why'); save();
-    if(!d.adopt.length) return fail('합의안에 넣을 정책을 하나 이상 고르세요.');
-    if(d.why.trim().length<MIN_WHY) return fail('합의안 근거를 '+MIN_WHY+'자 이상 쓰세요. 지금 '+d.why.trim().length+'자입니다.');
+    if(!Object.keys(props()).length) return fail('정책을 고른 조가 아직 없습니다.');
+    if(d.why.trim().length<MIN_WHY) return fail('의정부 결정 근거를 '+MIN_WHY+'자 이상 쓰세요. 지금 '+d.why.trim().length+'자입니다.');
     btn.disabled=true; btn.textContent='상신하는 중…';
-    API.post({action:'submit', code:L.code, teamId:L.teamId, memberId:L.memberId, turn:room.turn, adopt:d.adopt, why:d.why.trim()}).then(j=>{
-      if(!j.ok){ btn.disabled=false; btn.textContent='합의안 상신'; return fail(j.error); }
+    API.post({action:'submit', code:L.code, teamId:L.teamId, memberId:L.memberId, turn:room.turn, why:d.why.trim()}).then(j=>{
+      if(!j.ok){ btn.disabled=false; btn.textContent='의정부 결정 상신'; return fail(j.error); }
       editing=false; ver=0; poll();
-    }).catch(()=>{ btn.disabled=false; btn.textContent='합의안 상신'; fail('전송하지 못했습니다. 다시 눌러 주세요.'); });
+    }).catch(()=>{ btn.disabled=false; btn.textContent='의정부 결정 상신'; fail('전송하지 못했습니다. 다시 눌러 주세요.'); });
   }
   if(f.id==='fin'){
     L.ref={a:v('r1'),b:v('r2'),c:v('r3')}; save();
@@ -350,10 +358,6 @@ document.addEventListener('click', e=>{
       .then(j=>{ t.disabled=false; if(after(j,'perr')){ if(L.pd) delete L.pd[pid]; save(); closeModal(); } }).catch(()=>{ t.disabled=false; fail('전송하지 못했습니다.','perr'); }); return; }
   if(t.dataset.unprop){ const pid=t.dataset.unprop; t.disabled=true;
     API.post({action:'unpropose', code:L.code, teamId:L.teamId, memberId:L.memberId, turn:room.turn, pid}).then(j=>{ if(after(j,'perr')){ if(L.draft) L.draft.adopt=L.draft.adopt.filter(x=>x!==pid); save(); closeModal(); } else t.disabled=false; }); return; }
-  if(t.dataset.adopt){ const pid=t.dataset.adopt, d=L.draft, i=d.adopt.indexOf(pid);
-    if(i>=0) d.adopt.splice(i,1); else { if(d.adopt.length>=MAX_ADOPT){ closeModal(); return fail('합의안에는 '+MAX_ADOPT+'개까지 넣을 수 있습니다. 먼저 하나를 빼세요.'); } d.adopt.push(pid); }
-    save(); closeModal(); liveUpdate(); return; }
-  if(t.dataset.unadopt){ L.draft.adopt=L.draft.adopt.filter(x=>x!==t.dataset.unadopt); save(); liveUpdate(); return; }
   const a=t.dataset.act;
   if(a==='skip'){ const rv=document.getElementById('rv'); if(rv) skipStages(rv); return; }
   if(a==='edit'){ t.disabled=true; API.post({action:'retract', code:L.code, teamId:L.teamId, memberId:L.memberId}).then(j=>{ if(j.ok){ const s=room.mySub; draft(); if(s){ L.draft.adopt=s.adopt.map(x=>x.id); L.draft.why=s.why; save(); } } after(j); }); return; }
