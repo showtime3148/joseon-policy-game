@@ -54,7 +54,6 @@ function policyHTML(turn, p, o){
   return `<button type="button" class="pol ${o.state||''}" data-pol="${p.id}" aria-haspopup="dialog">
     <span class="ph"><i class="r-${d.id}">${d.icon}</i>${esc(d.dept)}${o.state==='prop'?'<em>제안됨</em>':o.state==='adopt'?'<em>✓ 우리 조 선택</em>':''}</span>
     <b>${esc(p.name)}</b><span class="ds">${esc(p.desc)}</span>
-    <span class="tags">${tagsOf(p.eff)}${p.later?'<span class="tag">몇 해 뒤 효과</span>':''}</span>
     ${o.by?`<span class="by">제안: ${esc(o.by)}</span>`:''}</button>`;
 }
 /* 결과 공개 때 현대 정책 해설 */
@@ -85,7 +84,7 @@ function surpriseCardHTML(S, o){
   o=o||{};
   return `<div class="surx ${o.big?'big':''}"><div class="sxh"><span class="sxi">${esc(S.icon)}</span><div><div class="sxe">急報 · 돌발 이벤트</div><h3>${esc(S.title)}</h3></div></div>
     <p>${esc(S.text)}</p>
-    <div class="sxo">${S.options.map(op=>`<${o.pick?'button type="button" data-sresp="'+op.id+'"':'div'} class="sxopt ${o.chosen===op.id?'on':''}"><b>${esc(op.label)}</b><span>${esc(op.desc)}</span><span class="tags">${tagsOf(op.eff)}</span></${o.pick?'button':'div'}>`).join('')}</div>
+    <div class="sxo">${S.options.map(op=>`<${o.pick?'button type="button" data-sresp="'+op.id+'"':'div'} class="sxopt ${o.chosen===op.id?'on':''}"><b>${esc(op.label)}</b><span>${esc(op.desc)}</span></${o.pick?'button':'div'}>`).join('')}</div>
     ${o.foot||''}</div>`;
 }
 

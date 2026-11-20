@@ -98,7 +98,8 @@ function ctlHTML(){
     right=`<button class="btn primary big" data-cmd="open">${last?'최종 결과 보기':'다음 사건 열기'}</button>`; }
   if(room.phase==='ended'){ const f=room.teams.reduce((a,t)=>a+t.members.filter(m=>m.final).length,0); left=`<span class="pill navy" style="font-size:15px">성찰 제출 ${f}/${P}명</span>`; right=`<button class="btn" data-act="newroom">새 방 만들기</button>`; }
   const ex = DEMO||room.phase==='lobby' ? '' : `<button class="btn" data-act="export">기록 내려받기(엑셀)</button>`;
-  return `<div class="row">${left}${ex}<span class="small" id="hmsg" style="color:var(--bad)"></span></div><div class="row">${right}</div>`;
+  const endb = room.phase==='deciding'||room.phase==='revealed' ? `<button class="btn" data-act="endask" style="border-color:var(--bad);color:var(--bad)">게임 끝내기</button>` : '';
+  return `<div class="row">${left}${ex}<span class="small" id="hmsg" style="color:var(--bad)"></span></div><div class="row">${endb}${right}</div>`;
 }
 function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const e=document.getElementById('timer'); if(!e||!room||!room.openedAt) return;
   const sec=Math.max(0,Math.floor((Date.now()-room.openedAt)/1000)); e.textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');
@@ -221,6 +222,11 @@ document.addEventListener('click', e=>{
   const t=e.target.closest('[data-act],[data-cmd]'); if(!t||t.disabled) return;
   if(t.dataset.cmd) return cmd(t.dataset.cmd, t);
   const a=t.dataset.act;
+  if(a==='endask'){ const n=room.phase==='revealed'?room.turn+1:room.turn;
+    openModal(`<div class="mh"><div><small>게임 끝내기</small><h2>여기서 회의를 마칠까요?</h2></div><button class="x" data-close aria-label="닫기">✕</button></div>
+      <div class="mbody"><p>지금까지 <b>${n}개 사건</b>의 결과로 최종 순위를 정하고, 학생 화면은 <b>성찰 쓰기</b>로 넘어갑니다.</p>${room.phase==='deciding'?'<p class="note">지금 열려 있는 사건은 결과 없이 닫힙니다.</p>':''}<p class="small muted">끝낸 뒤에는 다시 이어서 할 수 없습니다. 기록은 그대로 남아 엑셀로 내려받을 수 있습니다.</p></div>
+      <div class="mf"><button class="btn" data-close>계속하기</button><button class="btn primary" data-act="endnow">게임 끝내기</button></div>`); return; }
+  if(a==='endnow'){ t.disabled=true; closeModal(); return cmd('end'); }
   if(a==='flipreal'){ const fc=t.closest('.flipcard'); FX.flip(fc, false); return; }
   if(a==='create'){ t.disabled=true;
     API.post({action:'create', cls:document.getElementById('cls').value.trim()}).then(j=>{ if(!j.ok){ t.disabled=false; return fail(j.error); } const past=(H.past||[]).filter(x=>x.code!==j.code); past.unshift({code:j.code, hostKey:j.hostKey, cls:document.getElementById('cls').value.trim(), at:Date.now()}); H={code:j.code, hostKey:j.hostKey, past:past.slice(0,20)}; save(); ver=0; poll(); })

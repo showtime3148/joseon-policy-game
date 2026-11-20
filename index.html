@@ -179,7 +179,7 @@ function packHTML(){
     return `<div class="slot ${id?'on':''}"><i class="r-${r.id}">${r.icon}</i><b>${r.dept}</b><span>${id?esc(p.name):'보류(아직 고르지 않음)'}</span>${id?`<em class="small muted">${esc(P[id].name)}</em>`:''}${hint.length?`<span class="hintsyn" title="이 정책은 이 조들과 손발이 맞으면 시너지가 날 수 있습니다">🔗 ${hint.join('·')}</span>`:''}</div>`; }).join('');
   const n=Object.keys(P).length;
   return `<div class="slots">${rows}</div>
-    <div class="small" style="margin-top:6px"><b>${n}/6</b> 조 결정${n===6?' · <b style="color:var(--jade)">6조 전원 참여 보너스 +'+FULL_BONUS+'</b>':''} · 예상 방향 ${effList(packEffect(turn,Object.keys(P)))||'-'}</div>
+    <div class="small" style="margin-top:6px"><b>${n}/6</b> 조 결정${n===6?' · <b style="color:var(--jade)">6조 전원 참여 보너스 +'+FULL_BONUS+'</b>':''}</div>
     <p class="hint" style="margin:4px 0 0">🔗는 그 정책과 시너지가 날 수 있는 조입니다. 어떤 정책끼리 맞물리는지는 결과 공개 때 드러납니다. 시너지가 나면 <b>협력 보너스 점수</b>를 받고, 서로 부딪히면 점수를 잃습니다.</p>`;
 }
 function vDecide(){
@@ -199,7 +199,7 @@ function vDecide(){
   }
   const d=draft();
   $app.innerHTML=`${headHTML()}
-  <div class="card stack" style="margin-top:14px"><div class="row between"><h3 style="font-size:19px">6조의 정책</h3><span class="small muted">각 조는 정책 3개 중 하나를 고릅니다 · 정책을 누르면 자세히 볼 수 있습니다 · ▲▼는 즉시 효과의 방향</span></div>
+  <div class="card stack" style="margin-top:14px"><div class="row between"><h3 style="font-size:19px">6조의 정책</h3><span class="small muted">각 조는 정책 3개 중 하나를 고릅니다 · 정책을 누르면 자세히 볼 수 있습니다</span></div>
     <div id="pols">${polsHTML()}</div></div>
   <div class="play" style="margin-top:14px"><div class="stack">
     ${uCanDecide()?`<form class="card stack yeong" id="act" novalidate><h3 style="font-size:19px"><i class="r-yeong rico">領</i> 6조의 결정 · 영의정 상신</h3>
@@ -210,11 +210,11 @@ function vDecide(){
     <div class="card stack"><h3 style="font-size:17px">각 조가 고른 정책과 근거</h3><div id="plist">${propListHTML()}</div></div>
     <div class="card"><h3 style="font-size:17px; margin-bottom:10px">다른 의정부</h3><div id="live">${othersHTML()}</div></div></div>
   <div class="side">
-    <div class="card"><h3 style="font-size:16px; margin-bottom:8px">우리 나라</h3>${kingdomSVG(t.st)}<div style="margin-top:10px" id="gg">${gaugesHTML(t.st, uCanDecide()?packEffect(turn,Object.keys(props())):null)}</div>
-      ${uCanDecide()?'<p class="hint" style="margin:8px 0 0">빗금과 ▲▼는 6조 결정의 즉시 효과 방향입니다(크기·시너지·지연 효과는 숨김).</p>':''}</div>
+    <div class="card"><h3 style="font-size:16px; margin-bottom:8px">우리 나라</h3>${kingdomSVG(t.st)}<div style="margin-top:10px" id="gg">${gaugesHTML(t.st)}</div>
+      </div>
     <div class="card"><h3 style="font-size:16px;margin-bottom:8px">우리 의정부</h3><div id="mem">${membersHTML()}</div></div></div></div>`;
 }
-function updPreview(){ const gg=document.getElementById('gg'); if(gg&&uCanDecide()) gg.innerHTML=gaugesHTML(me().st, packEffect(curTurn(room),Object.keys(props()))); }
+function updPreview(){}
 function polModal(pid){
   const turn=curTurn(room), p=policyOf(turn,pid), d=deptOf(pid), pr=props()[pid], m=mine();
   const mineProp=pr&&pr.by===m.id, can=uCanPropose(pid)&&(!pr||mineProp), dec=uCanDecide();
@@ -235,7 +235,6 @@ function polModal(pid){
   if(dec && pr && !mineProp) foot=`<button class="btn" data-unprop="${pid}" style="margin-right:auto">다시 생각해 보라고 돌려보내기</button>`+foot;
   openModal(`<div class="mh"><div><small><i class="dico r-${d.id}">${d.icon}</i> ${esc(d.dept)} 정책</small><h2>${esc(p.name)}</h2></div><button class="x" data-close aria-label="닫기">✕</button></div>
     <div class="mbody"><div class="sec2"><h4>어떤 정책인가요</h4><p>${esc(p.desc)}</p></div>
-      <div class="sec2"><h4>예상되는 즉시 효과</h4><div class="tags">${effList(p.eff)}${p.later?'<span class="tag">몇 해 뒤 추가 효과 있음</span>':''}</div><p class="hint" style="margin-top:4px">방향만 공개됩니다.</p></div>
       ${partners.length?`<div class="sec2"><h4>🔗 시너지 가능성</h4><p>이 정책은 <b>${partners.map(esc).join('·')}</b>의 정책과 손발이 맞으면 시너지가 날 수 있습니다. 해당 조의 판서와 상의해 보세요.</p></div>`:''}
       ${body}</div><div class="mf">${foot}</div>`);
 }

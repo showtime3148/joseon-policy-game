@@ -182,6 +182,16 @@ function handle(d) {
       putRoom(r, true);
       return { ok: true };
     }
+    if (d.cmd === 'end') {
+      // 수업 시간에 맞춰 중간에 끝내기: 열려 있던 사건은 결과 없이 닫고 최종 결과로
+      if (r.phase === 'ended') return { ok: true };
+      if (r.phase === 'lobby') return { ok: false, error: '아직 시작하지 않은 방입니다.' };
+      r.endedAt = r.phase === 'revealed' ? r.turn + 1 : r.turn;   // 결과가 나온 사건 수
+      r.order.forEach(id => { const t = r.teams[id]; if (!t.game.done) finishGame(t.game); setProps(r, t, {}); t.sub = null; t.sresp = null; });
+      r.phase = 'ended'; r.sur = null;
+      putRoom(r, true);
+      return { ok: true };
+    }
     if (d.cmd === 'surprise') {
       if (r.phase !== 'deciding') return { ok: false, error: '사건이 열려 있을 때만 돌발 이벤트를 일으킬 수 있습니다.' };
       if (r.sur && r.sur.fired) return { ok: false, error: '이번 사건에는 이미 돌발 이벤트가 일어났습니다.' };
