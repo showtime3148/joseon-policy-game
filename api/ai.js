@@ -1,7 +1,7 @@
 /* AI 신하(사헌부 대사헌)와의 문답 — Vercel AI Gateway
  * 흐름: 판서가 고른 정책(또는 영의정의 합의안)에 대해 대사헌이 질문 → 학생이 말(또는 글)로 대답 → 짧은 평과 다음 질문 → 두 번째 대답 뒤 총평
  * 점수에는 영향이 없고, 끝난 문답은 Redis 목록(log_<방>_문답)에 쌓여 교사 화면의 엑셀 기록에 들어간다.
- * 인증: AI_GATEWAY_API_KEY 환경 변수가 있으면 그것을, 없으면 Vercel이 함수에 주는 OIDC 토큰을 쓴다.
+ * 인증: ANTHROPIC_API_KEY가 있으면 Claude API에 바로 연결. 없으면 Vercel AI Gateway(AI_GATEWAY_API_KEY 또는 OIDC 토큰).
  * AI를 부를 수 없을 때는 미리 준비한 질문으로 이어 가서 수업이 멈추지 않게 한다.
  */
 const makeEngine = require('./_engine.js');
@@ -30,7 +30,23 @@ function gatewayToken(req) {
   return process.env.AI_GATEWAY_API_KEY || (req.headers && req.headers['x-vercel-oidc-token']) || process.env.VERCEL_OIDC_TOKEN || '';
 }
 
+/* ANTHROPIC_API_KEY가 있으면 Claude API에 바로, 없으면 Vercel AI Gateway로 */
+const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-5-5';
+async function askClaude(system, user) {
+  const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 20000);
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST', signal: ctl.signal,
+      headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 400, temperature: 0.7, system: system, messages: [{ role: 'user', content: user }] })
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error('claude ' + r.status + ' ' + cut(j && j.error && (j.error.message || j.error.type), 200));
+    return (j.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
+  } finally { clearTimeout(tm); }
+}
 async function askModel(req, system, user) {
+  if (process.env.ANTHROPIC_API_KEY) return askClaude(system, user);
   const tok = gatewayToken(req);
   if (!tok) throw new Error('no-token');
   const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 20000);
@@ -89,8 +105,8 @@ module.exports = async (req, res) => {
       const q = req.query || {};
       if (q.action === 'ping') {  /* 배포 뒤 AI 연결 확인용 */
         const t0 = Date.now();
-        try { const s = await askModel(req, '한 단어로만 답하라.', '"준비" 라고만 말하라.'); return send({ ok: true, model: MODEL, auth: process.env.AI_GATEWAY_API_KEY ? 'key' : (req.headers['x-vercel-oidc-token'] ? 'oidc-header' : (process.env.VERCEL_OIDC_TOKEN ? 'oidc-env' : 'none')), reply: s, ms: Date.now() - t0 }); }
-        catch (e) { return send({ ok: false, model: MODEL, error: String(e.message || e), hasHeader: !!(req.headers && req.headers['x-vercel-oidc-token']), hasEnv: !!process.env.VERCEL_OIDC_TOKEN }); }
+        try { const s = await askModel(req, '한 단어로만 답하라.', '"준비" 라고만 말하라.'); return send({ ok: true, model: process.env.ANTHROPIC_API_KEY ? CLAUDE_MODEL : MODEL, auth: process.env.ANTHROPIC_API_KEY ? 'claude-api' : process.env.AI_GATEWAY_API_KEY ? 'key' : (req.headers['x-vercel-oidc-token'] ? 'oidc-header' : (process.env.VERCEL_OIDC_TOKEN ? 'oidc-env' : 'none')), reply: s, ms: Date.now() - t0 }); }
+        catch (e) { return send({ ok: false, model: process.env.ANTHROPIC_API_KEY ? CLAUDE_MODEL : MODEL, claudeKey: !!process.env.ANTHROPIC_API_KEY, error: String(e.message || e), hasHeader: !!(req.headers && req.headers['x-vercel-oidc-token']), hasEnv: !!process.env.VERCEL_OIDC_TOKEN }); }
       }
       return send({ ok: true, msg: 'AI 신하 문답 서버' });
     }
