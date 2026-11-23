@@ -4,6 +4,7 @@
  * - 구글 시트 대신 기록(기록·제안·제출)을 Redis 목록에 쌓고, 교사 화면에서 엑셀로 내려받음
  */
 const makeEngine = require('./_engine.js');
+const QA_HEAD = ['시각', '방', '사건', '연도', '사건 제목', '의정부', '이름', '역할', '대상 정책', '질문1', '대답1', '질문2', '대답2', '총평', '등급', '방식'];
 
 const URL_ = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -85,10 +86,11 @@ async function exportLogs(code, hostKey) {
   const [hk] = await redis([['GET', 'hk_' + code]]);
   if (!hk) return { ok: false, error: '기록을 찾을 수 없습니다(30일이 지났거나 없는 방).' };
   if (hk !== hostKey) return { ok: false, error: '교사 권한이 없습니다.' };
-  const res = await redis(SHEETS.map(n => ['LRANGE', 'log_' + code + '_' + n, '0', '-1']));
-  const heads = makeEngine(null, null, null, null).HEADS;
+  const names = SHEETS.concat(['문답']);
+  const res = await redis(names.map(n => ['LRANGE', 'log_' + code + '_' + n, '0', '-1']));
+  const heads = Object.assign({}, makeEngine(null, null, null, null).HEADS, { '문답': QA_HEAD });
   const sheets = {};
-  SHEETS.forEach((n, i) => { sheets[n] = [heads[n]].concat((res[i] || []).map(x => JSON.parse(x))); });
+  names.forEach((n, i) => { if (n === '문답' && !(res[i] || []).length) return; sheets[n] = [heads[n]].concat((res[i] || []).map(x => JSON.parse(x))); });
   return { ok: true, code: code, sheets: sheets };
 }
 

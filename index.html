@@ -27,6 +27,8 @@
 <script src="anim.js"></script>
 <script src="infographic.js"></script>
 <script src="common.js"></script>
+<script src="exile.js"></script>
+<script src="qa.js"></script>
 <script src="server/server.gs.js"></script>
 <script src="demo.js"></script>
 <script>
@@ -172,7 +174,7 @@ function propListHTML(){
   const turn=curTurn(room), P=props(), ids=Object.keys(P);
   if(!ids.length) return '<p class="muted small" style="margin:0">아직 고른 조가 없습니다. 판서는 자기 조의 정책 3개 중 하나를 눌러 고르세요.</p>';
   return ids.map(id=>{ const p=policyOf(turn,id), pr=P[id]; return `<div class="prop"><div class="row between"><b>${esc(p.name)}</b><span class="small muted">${esc(pr.name)} · ${esc(pr.role)}</span></div>
-    <p>${esc(pr.why)}</p><p class="small"><b>비슷한 현대 정책</b> ${esc(pr.modern)}</p></div>`; }).join('');
+    <p>${esc(pr.why)}</p><p class="small"><b>비슷한 현대 정책</b> ${esc(pr.modern)}</p>${room.phase==='deciding'&&uCanPropose(id)?`<button class="btn qa-btn" type="button" data-qa="${id}">🎙 대사헌의 질문 받기 <span class="small">AI 신하와 음성 문답</span></button>`:''}</div>`; }).join('');
 }
 function packHTML(){
   const turn=curTurn(room), P=props();
@@ -206,7 +208,7 @@ function vDecide(){
     ${uCanDecide()?`<form class="card stack yeong" id="act" novalidate><h3 style="font-size:19px"><i class="r-yeong rico">領</i> 6조의 결정 · 영의정 상신</h3>
       <div id="pack">${packHTML()}</div>
       <label class="f" for="why">의정부 결정 근거 <span class="hint">6조의 정책이 어떻게 서로 맞물리는지, 무엇을 얻고 무엇을 감수하는지 (${MIN_WHY}자 이상)</span><textarea id="why" maxlength="400">${esc(d.why)}</textarea><span class="hint" id="cnt">${d.why.trim().length}자</span></label>
-      <div class="err" id="err"></div><button class="btn primary big" type="submit">의정부 결정 상신</button></form>`
+      <div class="err" id="err"></div><div class="row" style="gap:8px"><button class="btn primary big" type="submit">의정부 결정 상신</button><button class="btn qa-btn" type="button" data-qa="pack">🎙 합의안 문답 <span class="small">대사헌에게 검증받기</span></button></div></form>`
       :`<div class="card stack"><h3 style="font-size:17px">6조의 결정</h3><div id="pack">${packHTML()}</div><p class="small muted" style="margin:0">모든 조가 고르면 영의정이 상신합니다.</p></div>`}
     <div class="card stack"><h3 style="font-size:17px">각 조가 고른 정책과 근거</h3><div id="plist">${propListHTML()}</div></div>
     <div class="card"><h3 style="font-size:17px; margin-bottom:10px">다른 의정부</h3><div id="live">${othersHTML()}</div></div></div>
@@ -249,13 +251,14 @@ function vReveal(){
   const mods = l&&l.adopt.length ? `<div class="card stack"><h3 style="font-size:18px">우리가 시행한 정책과 현대 정책</h3><p class="small muted" style="margin:0">왼쪽은 우리 의정부가 쓴 비슷한 현대 정책, 오른쪽은 해설입니다. 같은 점과 다른 점을 찾아보세요.</p>
     ${l.adopt.map((a,i)=>modernHTML(turn,a,{at:at+i*300})).join('')}</div>` : '';
   const tRank=at+300*(l?l.adopt.length:0)+600, tDist=tRank+3600, tReal=tDist+1500;
+  const released=l && releasedTeams(room, room.turn).some(x=>x.id===t.id);
   const rec = l ? (l.adopt.length ? `${turn.year}년(${esc(turn.reign)}), 「${esc(turn.title)}」에 대하여 ${esc(t.name)} 의정부는 <b>${l.adopt.map(a=>esc(policyOf(turn,a.id).name)).join(', ')}</b>을(를) 함께 시행하였다.`
     : `${turn.year}년, 「${esc(turn.title)}」에 대하여 ${esc(t.name)} 의정부는 끝내 <b>아무 정책도 내지 못하였다</b>.`) : '';
   $app.innerHTML=`<div class="stack" id="rv"><button class="skip" data-act="skip">건너뛰기 ▶▶</button>
     <div class="card stack"><div class="row between"><div class="eyebrow">${turn.year}년 실록</div><span class="pill navy" data-at="${tRank}">현재 ${r}위 · ${t.score}점</span></div>
       ${l?`<div class="rec" data-at="0" data-fx="type">${rec}</div>
       <div class="deltas">${SKEYS.map((k,i)=>`<div class="dl" data-at="${1700+i*160}" data-fx="count" data-to="${l.delta[k]}"><div class="k">${STATS[k].name}</div><div class="n z">±0</div><div class="small muted num">${Math.round(t.st[k])}</div></div>`).join('')}</div>
-      ${notes}`:'<p class="muted">이번 사건에는 참여하지 않았습니다.</p>'}</div>
+      ${notes}${released?`<div class="note combo ex-free" data-at="${tRank}">🎉 귀양에서 풀려났습니다(해배). ${esc(josa(exileWho(t),'이가'))} 조정으로 돌아옵니다!</div>`:''}`:'<p class="muted">이번 사건에는 참여하지 않았습니다.</p>'}</div>
     <div class="play"><div class="card stack"><h3 style="font-size:17px">우리 나라의 변화</h3>
         <div class="kgrid"><div class="kswap" data-at="2300" data-fx="swap"><div class="k-old">${kingdomSVG(prev)}</div><div class="k-new">${kingdomSVG(t.st)}</div></div>
         <div data-at="2300" data-fx="bars">${gaugesFromTo(prev, t.st)}</div></div></div>
@@ -269,7 +272,10 @@ function vReveal(){
     <div class="card"><h3 style="font-size:17px; margin-bottom:10px">각 나라의 모습</h3><div id="live">${othersHTML()}</div>
       <p class="small muted" style="margin:10px 0 0">${room.turn+1>=ERA.turns.length?'선생님이 최종 결과를 열면 회의가 마무리됩니다.':'선생님이 다음 사건을 열 때까지 결과를 함께 살펴보세요.'}</p></div></div>`;
   runStages(document.getElementById('rv'));
+  clearTimeout(exTimer);
+  if(l && t.score<EXILE_LINE) exTimer=setTimeout(()=>{ if(room && room.phase==='revealed' && !exileSeen(room.code, room.turn, t.id)) exileOverlay(room, [t], room.turn); }, tRank+900);
 }
+let exTimer=0;
 
 /* ---------- 최종 ---------- */
 function reportText(){

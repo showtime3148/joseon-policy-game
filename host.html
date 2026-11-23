@@ -44,6 +44,7 @@ main{max-width:1500px}
 <script src="anim.js"></script>
 <script src="infographic.js"></script>
 <script src="common.js"></script>
+<script src="exile.js"></script>
 <script src="server/server.gs.js"></script>
 <script src="demo.js"></script>
 <script>
@@ -185,14 +186,19 @@ function vReveal(){
     <div class="card stack"><div class="evscene" style="border:none; grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)">${eventScene(turn.art, turn.war)}<div><div class="yr" style="font-size:17px">${turn.year}년 · ${esc(turn.reign)}</div><h2 style="font-size:32px">${esc(turn.title)} · 의정부들의 선택</h2></div></div>
       <div data-at="3200" data-fx="chips">${distAnimHTML(room, room.turn, null)}</div>
       ${realFlipHTML(turn, anyMatch, null, true)}
-      ${crises?`<div class="row">${crises}</div>`:''}</div>
+      ${crises?`<div class="row">${crises}</div>`:''}
+      ${exiledTeams(room, room.turn).length||releasedTeams(room, room.turn).length?`<div class="row">${exiledTeams(room, room.turn).map(t=>`<span class="pill bad" style="font-size:15px">流 ${esc(t.name)} · ${esc(exRo(exilePlace(t, room.turn).name))} 귀양</span>`).join('')}${releasedTeams(room, room.turn).map(t=>`<span class="pill good" style="font-size:15px">🎉 ${esc(t.name)} · 귀양에서 풀려남</span>`).join('')}</div>`:''}</div>
     <div class="card stack" data-at="2600"><h3 style="font-size:20px">이번 사건의 시너지 도감 <span class="small muted" style="font-family:var(--body)">어떤 조의 정책이 맞물렸나?</span></h3>${synergyHTML(room, room.turn, null)}</div>
     ${modernAll(turn)}
     <div style="display:grid; grid-template-columns:1fr 380px; gap:16px; align-items:start" class="rv">
       <div class="card"><h3 style="font-size:20px; margin-bottom:10px">각 나라의 모습</h3><div id="live">${gridHTML()}</div></div>
       <div class="card"><h3 style="font-size:20px; margin-bottom:10px">순위</h3><div data-at="3600" data-fx="rank">${lbAnimHTML(room,null,room.turn)}</div></div></div></div>`;
   runStages(document.getElementById('rv'));
+  clearTimeout(exTimer);
+  const ex=exiledTeams(room, room.turn);
+  if(ex.length) exTimer=setTimeout(()=>{ if(room && room.phase==='revealed' && !exileSeen(room.code, room.turn, 'host')) exileOverlay(room, ex, room.turn, {host:true}); }, 4400);
 }
+let exTimer=0;
 
 /* ---------- 최종 ---------- */
 function vEnd(){

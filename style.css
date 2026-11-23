@@ -419,3 +419,74 @@ button.sxopt{cursor:pointer} button.sxopt:hover{border-color:#8c2d1e}
 .mbr{display:flex; justify-content:space-between; font-size:14px} .mbr.good span{color:var(--jade); font-weight:800} .mbr.bad span{color:var(--bad); font-weight:800}
 .pbbonus{font-size:10px; color:#7a5a12; font-weight:700}
 .slot > :not(i){grid-column:2; min-width:0}
+
+/* ── 귀양 이벤트 ── */
+.exbadge{display:inline-block; background:#3b3048; color:#f1c27a; border-radius:999px; padding:2px 9px; font-size:12px; font-weight:700; letter-spacing:.04em; margin:2px 0; animation:exPulse 1.6s ease-in-out infinite}
+@keyframes exPulse{50%{opacity:.6}}
+.ex-bg{position:fixed; inset:0; z-index:80; background:rgba(20,14,24,.72); display:flex; align-items:center; justify-content:center; padding:14px; animation:fadein .3s}
+.ex-bg.out{opacity:0; transition:opacity .25s}
+.ex-box{background:#f6efe2; border-radius:14px; max-width:720px; width:100%; max-height:calc(100% - 20px); overflow-y:auto; box-shadow:0 24px 70px rgba(0,0,0,.5); border:3px solid #3b3048; animation:exDrop .55s cubic-bezier(.2,1.4,.4,1)}
+@keyframes exDrop{from{transform:translateY(-40px) scale(.92); opacity:0}}
+.ex-head{display:flex; align-items:center; gap:14px; padding:14px 18px; background:#3b3048; color:#f6efe2}
+.ex-head small{display:block; font-size:13px; opacity:.85}
+.ex-head h2{font-size:34px; color:#f1c27a; margin:0; letter-spacing:.06em}
+.ex-stamp{font-family:serif; font-weight:900; font-size:22px; color:#b23a2c; background:#f6efe2; border:3px solid #b23a2c; border-radius:6px; padding:4px 6px; transform:rotate(-12deg); animation:exStamp .6s .35s both cubic-bezier(.3,1.8,.5,1)}
+@keyframes exStamp{from{transform:scale(2.4) rotate(-30deg); opacity:0}}
+.ex-svg{display:block; width:100%; height:auto}
+.ex-walk{animation:exWalk 7s linear .3s both}
+@keyframes exWalk{from{transform:translateX(-120px)} to{transform:translateX(420px)}}
+.ex-walk.to-boat{animation:exWalkSea 7s ease-in-out .3s both}
+@keyframes exWalkSea{0%{transform:translateX(-120px)} 45%{transform:translateX(200px)} 100%{transform:translateX(470px) translateY(-6px)}}
+.ex-boat{opacity:0; animation:exBoat 7s .3s both}
+@keyframes exBoat{0%,44%{opacity:0} 50%,100%{opacity:1}}
+.ex-p,.ex-g{animation:exBob .5s ease-in-out infinite alternate}
+@keyframes exBob{to{transform:translateY(-2px)}}
+.ex-p{animation-delay:.15s}
+.ex-leg line:first-child{animation:exLegA .5s ease-in-out infinite alternate}
+.ex-leg line:last-child{animation:exLegA .5s ease-in-out infinite alternate-reverse}
+@keyframes exLegA{from{transform:translateX(-3px)} to{transform:translateX(3px)}}
+.ex-crows{animation:exCrow 9s linear infinite}
+@keyframes exCrow{from{transform:translateX(-60px)} to{transform:translateX(120px)}}
+.ex-list{display:flex; flex-direction:column; gap:10px; padding:14px 18px 4px}
+.ex-card{border-left:6px solid var(--nc, #3b3048); background:#fff; border-radius:8px; padding:10px 14px; animation:exDrop .5s .8s both}
+.ex-nm{display:flex; align-items:center; gap:8px; font-size:18px}
+.ex-nm .num{margin-left:auto; color:#b23a2c; font-weight:800}
+.ex-msg{margin:6px 0 2px; font-size:17px; line-height:1.55}
+.ex-place{color:#b23a2c; font-size:20px}
+.ex-note{margin:0; color:#6a5a48}
+.ex-foot{padding:6px 18px 0; color:#5a4a3a; margin:0}
+.ex-box > .btn{display:block; margin:12px auto 18px; min-width:200px}
+.ex-free{font-weight:700}
+@media (prefers-reduced-motion: reduce){.ex-walk,.ex-walk.to-boat{animation:none; transform:translateX(200px)} .ex-boat{animation:none; opacity:1} .ex-p,.ex-g,.ex-leg,.ex-crows,.exbadge{animation:none}}
+
+/* ── AI 신하 문답 ── */
+.qa-btn{margin-top:8px; border-color:#6b2a3a; color:#6b2a3a; background:#fbf3f0}
+.qa-btn .small{opacity:.75; font-weight:400}
+.qa-bg{z-index:70}
+.qa-modal{max-width:640px; display:flex; flex-direction:column}
+.qa-top{display:grid; grid-template-columns:72px 1fr; gap:4px 12px; align-items:center; padding:12px 18px 4px}
+.qa-face{grid-row:span 2; width:72px}
+.qa-face svg{width:72px; height:auto}
+#qa.speaking .qa-face svg{animation:qaTalk .35s ease-in-out infinite alternate}
+@keyframes qaTalk{to{transform:translateY(-2px) scale(1.03)}}
+.qa-tts{display:flex; align-items:center; gap:6px; color:var(--muted)}
+.qa-log{display:flex; flex-direction:column; gap:10px; padding:10px 18px; max-height:46vh; overflow-y:auto}
+.qa-b{position:relative; border-radius:12px; padding:10px 14px; max-width:88%; line-height:1.6}
+.qa-b.new,.qa-b.think{animation:pop .25s ease-out}
+.qa-b p{margin:0; font-size:16px}
+.qa-b .who{display:block; font-size:12px; font-weight:700; opacity:.75; margin-bottom:2px}
+.qa-b.ai{background:#f4e9e3; border:1px solid #e2cfc5; align-self:flex-start; padding-right:40px}
+.qa-b.me{background:#e8f0ee; border:1px solid #cfe0db; align-self:flex-end}
+.qa-b.fin{background:#fff8e6; border:2px solid var(--gold, #c8a14a); max-width:100%}
+.qa-rep{position:absolute; right:6px; top:6px; border:none; background:none; font-size:16px; cursor:pointer; padding:4px}
+.qa-grade{position:absolute; right:40px; top:-12px; width:42px; height:42px; border-radius:50%; display:grid; place-items:center; font-family:serif; font-size:22px; font-weight:900; color:#fff; transform:rotate(-10deg); animation:exStamp .5s both cubic-bezier(.3,1.8,.5,1)}
+.qa-grade.g-상{background:#2f6b5e} .qa-grade.g-중{background:#c8a14a} .qa-grade.g-하{background:#b23a2c}
+.qa-b.think p{display:flex; gap:5px; padding:6px 0}
+.qa-b.think i{width:8px; height:8px; border-radius:50%; background:#9a7a6a; animation:qaDot 1s infinite}
+.qa-b.think i:nth-child(2){animation-delay:.15s} .qa-b.think i:nth-child(3){animation-delay:.3s}
+@keyframes qaDot{50%{opacity:.25; transform:translateY(-3px)}}
+.qa-in{display:flex; flex-direction:column; gap:8px; padding:8px 18px 16px; border-top:1px solid var(--line)}
+.qa-in textarea{min-height:80px; font-size:16px}
+.qa-mic.on{background:#b23a2c; color:#fff; border-color:#b23a2c; animation:exPulse 1.2s infinite}
+.qa-end{display:flex; gap:8px; justify-content:flex-end; padding:8px 18px 16px}
+[hidden]{display:none!important}

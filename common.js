@@ -38,7 +38,7 @@ function teamCard(room, t, o){
   const adopted = room.phase==='revealed' && last && last.t===room.turn ? `<div class="chips" style="gap:4px">${last.adopt.length?last.adopt.map(a=>{ const p=policyOf(turn,a.id); return `<span class="cchip ${turn.real.ids.includes(a.id)?'real':''}">${esc(p?p.name:a.id)}</span>`; }).join(''):'<span class="small" style="color:var(--bad)">정책 없음</span>'}</div>` : '';
   return `<div class="tc nation ${o.me?'me':''}" style="--nc:${nationColor(room,t.id)}">${room.phase!=='lobby'?`<span class="rk r${r}">${r}</span>`:''}
     <div class="nm">${flagSVG(room,t,28)}<b>${esc(t.name)}</b>${room.phase!=='lobby'?`<span class="sc num">${t.score}</span>`:''}</div>
-    ${badge}${sb}${kingdomSVG(t.st,{crisis:last&&last.notes.some(n=>n.type==='crisis')})}
+    ${badge}${sb}${room.phase!=='lobby'&&t.log.length&&t.score<EXILE_LINE?`<span class="exbadge" title="점수 ${EXILE_LINE}점 미만">流 귀양 중</span>`:''}${kingdomSVG(t.st,{crisis:last&&last.notes.some(n=>n.type==='crisis')})}
     ${minibars(t.st)}${adopted}
     ${o.members?`<div class="small mlist">${t.members.map(memberLine).join('')||'<span class="muted">모둠원 없음</span>'}</div>`:''}</div>`;
 }
