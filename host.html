@@ -100,9 +100,10 @@ function ctlHTML(){
     right=`<button class="btn primary big" data-cmd="open">${last?'최종 결과 보기':'다음 사건 열기'}</button>`; }
   if(room.phase==='ended'){ const f=room.teams.reduce((a,t)=>a+t.members.filter(m=>m.final).length,0); left=`<span class="pill navy" style="font-size:15px">성찰 제출 ${f}/${P}명</span>`; right=`<button class="btn" data-act="newroom">새 방 만들기</button>`; }
   const ex = DEMO||room.phase==='lobby' ? '' : `<button class="btn" data-act="export">기록 내려받기(엑셀)</button>`;
+  const dsh = DEMO ? '' : `<a class="btn" href="daesaheon.html?code=${room.code}" target="_blank" rel="noopener" title="별도의 컴퓨터나 창에 띄우는 AI 대사헌 음성 대화 화면">🎙 대사헌 화면</a>`;
   const endb = (room.phase==='deciding'||room.phase==='revealed' ? `<button class="btn" data-act="endask" style="border-color:var(--bad);color:var(--bad)">게임 끝내기</button>` : '')
     + `<button class="btn" data-act="closeask" data-code="${room.code}" data-key="${H.hostKey}" style="border-color:var(--bad);color:var(--bad)">방 종료</button>`;
-  return `<div class="row">${left}${ex}<span class="small" id="hmsg" style="color:var(--bad)"></span></div><div class="row">${endb}${right}</div>`;
+  return `<div class="row">${left}${ex}${dsh}<span class="small" id="hmsg" style="color:var(--bad)"></span></div><div class="row">${endb}${right}</div>`;
 }
 function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const e=document.getElementById('timer'); if(!e||!room||!room.openedAt) return;
   const sec=Math.max(0,Math.floor((Date.now()-room.openedAt)/1000)); e.textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');

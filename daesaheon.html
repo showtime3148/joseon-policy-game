@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>사헌부 대사헌 · 조선 국정 회의</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@700;800&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:,">
+<style>
+:root{--ink:#2b2118; --red:#8e2a2a; --gold:#d8b25a; --cream:#f6efe2}
+*{box-sizing:border-box}
+html,body{margin:0; height:100%; background:#1a1110; color:var(--cream); font-family:'Noto Sans KR',sans-serif; overflow:hidden}
+.stage{position:fixed; inset:0; display:grid; grid-template-rows:auto 1fr auto; background:radial-gradient(ellipse at 50% 35%, #5b2620 0%, #2a1512 55%, #140c0b 100%)}
+.stage::before{content:''; position:absolute; inset:0; background:
+  linear-gradient(90deg, transparent 0 8%, rgba(216,178,90,.08) 8% 8.6%, transparent 8.6% 91.4%, rgba(216,178,90,.08) 91.4% 92%, transparent 92%),
+  repeating-linear-gradient(90deg, rgba(0,0,0,.0) 0 140px, rgba(0,0,0,.12) 140px 146px); pointer-events:none}
+header{position:relative; display:flex; align-items:center; gap:14px; padding:14px 22px; z-index:2}
+header h1{font-family:'Nanum Myeongjo',serif; font-size:clamp(20px,2.4vw,30px); margin:0; color:var(--gold); letter-spacing:.08em}
+header .sub{opacity:.75; font-size:14px}
+header .sp{flex:1}
+.cfg{display:flex; align-items:center; gap:8px; font-size:14px}
+.cfg input{width:90px; padding:6px 8px; border-radius:6px; border:1px solid #6b4a3a; background:#2a1a16; color:var(--cream); font-size:15px; letter-spacing:.15em; text-transform:uppercase}
+.cfg button,.cfg select{padding:6px 10px; border-radius:6px; border:1px solid #6b4a3a; background:#2a1a16; color:var(--cream); font-size:14px; cursor:pointer}
+.room{font-size:13px; opacity:.85}
+.mid{position:relative; display:grid; place-items:end center; min-height:0}
+#ch{height:min(calc(100vh - 330px), 120vw); min-height:260px; width:auto; max-width:96vw; filter:drop-shadow(0 30px 40px rgba(0,0,0,.55))}
+#ch .head{transform-origin:200px 300px; transform-box:view-box}
+.idle #ch .head{animation:breathe 4.5s ease-in-out infinite}
+@keyframes breathe{50%{transform:translateY(3px) rotate(.4deg)}}
+#ch .body{animation:breathe2 4.5s ease-in-out infinite}
+@keyframes breathe2{50%{transform:translateY(2px)}}
+#eyes{transform-origin:200px 214px; transform-box:view-box; transition:transform .06s}
+#eyes.blink{transform:scaleY(.08)}
+.listen #brows{transform:translateY(-6px)} #brows{transition:transform .25s}
+.listen #ch .head{transform:rotate(-3deg) translateX(-4px); transition:transform .4s}
+.think #ch .head{transform:rotate(2deg); transition:transform .4s}
+.think #pupils{transform:translate(6px,-5px)} #pupils{transition:transform .3s}
+.foot{position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:10px; padding:8px 22px 16px; margin-top:-30px}
+.sub-box{background:rgba(20,10,8,.72); border:1px solid rgba(216,178,90,.35); border-radius:14px; padding:10px 22px; min-height:2.2em; max-width:1100px; width:100%; text-align:center; font-family:'Nanum Myeongjo',serif; font-weight:800; font-size:clamp(22px,2.8vw,40px); line-height:1.45; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.8)}
+.sub-box .said{color:var(--gold)} .sub-box:empty{display:none}
+.heard{min-height:1.6em; font-size:clamp(16px,1.6vw,22px); opacity:.9}
+.heard b{color:#9fd3c7}
+.ctrl{display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:center}
+.mic{width:86px; height:86px; border-radius:50%; border:4px solid var(--gold); background:var(--red); color:#fff; font-size:34px; cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.mic.on{background:#c0392b; animation:pulse 1.1s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(216,178,90,.7)} 100%{box-shadow:0 0 0 26px rgba(216,178,90,0)}}
+.mic:disabled{opacity:.5; cursor:default}
+.txt{display:flex; gap:8px}
+.txt input{width:min(46vw,520px); padding:10px 12px; border-radius:8px; border:1px solid #6b4a3a; background:#2a1a16; color:var(--cream); font-size:16px}
+.txt button{padding:10px 16px; border-radius:8px; border:1px solid var(--gold); background:#3a2420; color:var(--cream); font-size:16px; cursor:pointer}
+.status{font-size:14px; opacity:.8; min-height:1.3em}
+.hint{font-size:13px; opacity:.6}
+.dots i{display:inline-block; width:10px; height:10px; margin:0 4px; border-radius:50%; background:var(--gold); animation:dot 1s infinite}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes dot{50%{opacity:.2; transform:translateY(-6px)}}
+.gate{position:fixed; inset:0; z-index:9; display:grid; place-items:center; background:rgba(10,6,6,.82)}
+.gate div{text-align:center; max-width:560px; padding:20px}
+.gate h2{font-family:'Nanum Myeongjo',serif; color:var(--gold); font-size:34px; margin:0 0 10px}
+.gate p{opacity:.85; line-height:1.6}
+.gate button{margin-top:14px; padding:14px 30px; font-size:20px; border-radius:10px; border:2px solid var(--gold); background:var(--red); color:#fff; cursor:pointer}
+header{flex-wrap:wrap} header h1,header .sub,.cfg label{white-space:nowrap}
+@media (max-width:700px){header .sub,.hint{display:none} header .sp{display:none} .txt input{width:52vw}}
+@media (prefers-reduced-motion: reduce){.idle #ch .head,#ch .body{animation:none}}
+</style>
+</head>
+<body>
+<div class="stage idle" id="stage">
+  <header><h1>司憲府 大司憲</h1><span class="sub">AI 대사헌 · 말로 묻고 말로 듣기</span><span class="sp"></span>
+    <div class="cfg"><label for="code">방 코드</label><input id="code" maxlength="6" placeholder="선택"><button id="link" type="button">연결</button><span class="room" id="room"></span>
+      <select id="voice" aria-label="목소리"></select></div></header>
+  <div class="mid" id="mid"></div>
+  <div class="foot">
+    <div class="heard" id="heard" aria-live="polite"></div>
+    <div class="sub-box" id="sub" aria-live="polite"></div>
+    <div class="ctrl"><button class="mic" id="mic" type="button" aria-label="말하기">🎤</button>
+      <form class="txt" id="tf"><input id="tq" placeholder="말 대신 글로 물어도 되오" maxlength="300"><button type="submit">묻기</button></form></div>
+    <div class="status" id="st"></div>
+    <div class="hint">마이크 버튼이나 <b>스페이스바</b>를 누르고 말하세요 · 말을 마치면 대사헌이 대답합니다 · Esc: 대답 멈추기</div>
+  </div>
+</div>
+<div class="gate" id="gate"><div><h2>대사헌을 모시겠소?</h2><p>이 화면은 교실의 큰 화면이나 별도의 컴퓨터에 띄워 두는 대사헌 화면입니다.<br>스피커와 마이크가 있는 크롬 브라우저에서 가장 잘 작동합니다.<br>처음에 마이크 사용을 묻는 창이 뜨면 <b>허용</b>을 눌러 주세요.</p><button id="go" type="button">대사헌 입장</button></div></div>
+<script>
+/* ---------- 대사헌 그림 ---------- */
+function charSVG(){
+  const INK='#2b2118';
+  return `<svg id="ch" viewBox="0 0 400 480" role="img" aria-label="사헌부 대사헌">
+  <defs>
+    <linearGradient id="robe" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9b2d34"/><stop offset="1" stop-color="#5e1a20"/></linearGradient>
+    <radialGradient id="skin" cx=".5" cy=".42" r=".6"><stop offset="0" stop-color="#f6dcc0"/><stop offset="1" stop-color="#e2b893"/></radialGradient>
+    <linearGradient id="hat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2c2622"/><stop offset="1" stop-color="#14110f"/></linearGradient>
+  </defs>
+  <g class="body">
+    <path d="M40 480 Q46 360 120 330 Q160 318 200 330 Q240 318 280 330 Q354 360 360 480Z" fill="url(#robe)" stroke="${INK}" stroke-width="2"/>
+    <path d="M168 330 L200 400 L232 330" fill="none" stroke="#f3e6cf" stroke-width="10" stroke-linejoin="round"/>
+    <path d="M168 330 L200 400 L232 330" fill="none" stroke="${INK}" stroke-width="1.5"/>
+    <rect x="150" y="408" width="100" height="72" rx="4" fill="#24365a" stroke="#d8b25a" stroke-width="3"/>
+    <g stroke="#d8b25a" stroke-width="2" fill="none"><circle cx="200" cy="444" r="20"/><path d="M186 444 q14 -18 28 0 q-14 18 -28 0"/><path d="M170 420 q8 6 0 12 M230 420 q-8 6 0 12 M170 468 q8 -6 0 -12 M230 468 q-8 -6 0 -12"/></g>
+    <path d="M40 480 Q60 420 96 404" fill="none" stroke="#4a1418" stroke-width="3"/><path d="M360 480 Q340 420 304 404" fill="none" stroke="#4a1418" stroke-width="3"/>
+  </g>
+  <g class="head" id="head">
+    <rect x="178" y="288" width="44" height="44" fill="#e2b893"/>
+    <ellipse cx="128" cy="226" rx="12" ry="20" fill="#e8c09c" stroke="${INK}" stroke-width="1.5"/>
+    <ellipse cx="272" cy="226" rx="12" ry="20" fill="#e8c09c" stroke="${INK}" stroke-width="1.5"/>
+    <path d="M130 200 Q130 120 200 118 Q270 120 270 200 L268 246 Q262 300 200 312 Q138 300 132 246Z" fill="url(#skin)" stroke="${INK}" stroke-width="2"/>
+    <g id="brows"><path d="M150 186 Q170 174 190 184" stroke="#3a2c22" stroke-width="7" stroke-linecap="round" fill="none"/><path d="M210 184 Q230 174 250 186" stroke="#3a2c22" stroke-width="7" stroke-linecap="round" fill="none"/></g>
+    <g id="eyes">
+      <ellipse cx="172" cy="214" rx="15" ry="9" fill="#fff" stroke="${INK}" stroke-width="1.6"/>
+      <ellipse cx="228" cy="214" rx="15" ry="9" fill="#fff" stroke="${INK}" stroke-width="1.6"/>
+      <g id="pupils"><circle cx="173" cy="215" r="6" fill="#2a1d14"/><circle cx="229" cy="215" r="6" fill="#2a1d14"/><circle cx="175" cy="213" r="1.8" fill="#fff"/><circle cx="231" cy="213" r="1.8" fill="#fff"/></g>
+      <path d="M156 210 Q172 200 188 210" stroke="${INK}" stroke-width="2.4" fill="none"/><path d="M212 210 Q228 200 244 210" stroke="${INK}" stroke-width="2.4" fill="none"/>
+    </g>
+    <path d="M200 222 Q194 246 190 252 Q200 258 210 252" stroke="#b98c68" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+    <ellipse cx="160" cy="250" rx="14" ry="7" fill="#e79a86" opacity=".35"/><ellipse cx="240" cy="250" rx="14" ry="7" fill="#e79a86" opacity=".35"/>
+    <g id="mouthG">
+      <ellipse id="mouth" cx="200" cy="274" rx="15" ry="2" fill="#5a1f1f" stroke="${INK}" stroke-width="1.6"/>
+      <rect id="teeth" x="190" y="271" width="20" height="3" rx="1" fill="#fbf6ea" opacity="0"/>
+    </g>
+    <path d="M168 266 Q184 256 200 264 Q216 256 232 266 Q218 262 200 270 Q182 262 168 266Z" fill="#3a2c22" stroke="${INK}" stroke-width="1"/>
+    <g id="beard"><path d="M186 286 Q200 282 214 286 Q216 330 200 352 Q184 330 186 286Z" fill="#3a2c22" stroke="${INK}" stroke-width="1"/>
+      <path d="M194 300 Q200 330 200 346 M206 300 Q202 330 200 346" stroke="#5a4636" stroke-width="1.2" fill="none"/></g>
+    <g>
+      <path d="M140 150 Q140 92 200 86 Q260 92 260 150 Z" fill="url(#hat)" stroke="${INK}" stroke-width="2"/>
+      <path d="M150 118 Q200 64 250 118 Q240 82 200 78 Q160 82 150 118Z" fill="#1d1916" stroke="${INK}" stroke-width="1.5"/>
+      <rect x="132" y="146" width="136" height="14" rx="5" fill="#1d1916" stroke="${INK}" stroke-width="1.5"/>
+      <g class="wing"><ellipse cx="96" cy="128" rx="40" ry="14" fill="#1d1916" stroke="${INK}" stroke-width="1.5" transform="rotate(-8 96 128)"/><ellipse cx="304" cy="128" rx="40" ry="14" fill="#1d1916" stroke="${INK}" stroke-width="1.5" transform="rotate(8 304 128)"/></g>
+      <path d="M132 156 L140 150 M268 156 L260 150" stroke="${INK}" stroke-width="2"/>
+    </g>
+  </g>
+  </svg>`;
+}
+document.getElementById('mid').innerHTML = charSVG();
+
+/* ---------- 상태 ---------- */
+const $ = id => document.getElementById(id);
+const stage = $('stage'), subEl = $('sub'), heard = $('heard'), st = $('st'), mic = $('mic');
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const AI_URL = '/api/ai';
+let hist = [], speaking = false, busy = false, listening = false, rec = null, code = '', voices = [];
+const q0 = new URLSearchParams(location.search); if (q0.get('code')) { code = q0.get('code').toUpperCase(); $('code').value = code; }
+function mode(m){ stage.classList.remove('idle', 'listen', 'think', 'talk'); stage.classList.add(m); }
+
+/* ---------- 눈 깜빡임 · 입 모양 ---------- */
+const eyes = $('eyes'), mouth = $('mouth'), teeth = $('teeth'), beard = $('beard'), mouthG = $('mouthG');
+function blink(){ eyes.classList.add('blink'); setTimeout(() => eyes.classList.remove('blink'), 130); setTimeout(blink, 2200 + Math.random() * 3500); }
+setTimeout(blink, 1500);
+let open = 0, target = 0, nextSyl = 0, burst = 0;
+function frame(t){
+  if (speaking) {
+    if (t > nextSyl) { target = .25 + Math.random() * .75; nextSyl = t + 80 + Math.random() * 90; if (Math.random() < .12) { target = 0; nextSyl = t + 140; } }
+    if (burst > t) target = Math.max(target, .9);
+  } else target = 0;
+  open += (target - open) * (speaking ? .45 : .25);
+  const ry = 2 + open * 13;
+  mouth.setAttribute('ry', ry.toFixed(1)); mouth.setAttribute('cy', (274 + open * 6).toFixed(1));
+  mouth.setAttribute('rx', (15 - open * 3).toFixed(1));
+  teeth.setAttribute('opacity', open > .3 ? .9 : 0); teeth.setAttribute('y', (271 + open * 1).toFixed(1));
+  beard.setAttribute('transform', `translate(0 ${(open * 7).toFixed(1)})`);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------- 목소리 ---------- */
+function loadVoices(){
+  voices = (speechSynthesis.getVoices() || []).filter(v => /^ko/i.test(v.lang));
+  const sel = $('voice'), keep = sel.value || localStorage.getItem('dsh-voice') || '';
+  sel.innerHTML = voices.map(v => `<option value="${v.name}">${v.name.replace(/Microsoft |Google |\(.*?\)/g, '').trim() || v.name}</option>`).join('') || '<option value="">기본 목소리</option>';
+  const male = voices.find(v => /InJoon|Hyunsu|남|male|Minsu/i.test(v.name));
+  sel.value = voices.some(v => v.name === keep) ? keep : (male ? male.name : (voices[0] ? voices[0].name : ''));
+}
+if (window.speechSynthesis) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+$('voice').addEventListener('change', e => { try { localStorage.setItem('dsh-voice', e.target.value); } catch (er) {} });
+
+function sentences(t){ return (t.match(/[^.!?。…]+[.!?。…]*\s*/g) || [t]).map(s => s.trim()).filter(Boolean); }
+function say(text, done){
+  stopSpeak(true);
+  const parts = sentences(text); let i = 0;
+  speaking = false; mode('talk');
+  subEl.innerHTML = '';
+  const show = k => { subEl.innerHTML = parts.map((p, j) => j < k ? `<span class="said">${esc(p)}</span>` : j === k ? `<span>${esc(p)}</span>` : '').join(' '); };
+  const next = () => {
+    if (i >= parts.length) { speaking = false; mode('idle'); subEl.innerHTML = `<span class="said">${esc(text)}</span>`; if (done) done(); return; }
+    show(i);
+    if (!window.speechSynthesis) { speaking = true; setTimeout(() => { speaking = false; i++; next(); }, 120 * parts[i].length); return; }
+    const u = new SpeechSynthesisUtterance(parts[i]);
+    u.lang = 'ko-KR'; u.rate = .95; u.pitch = .7;
+    const v = voices.find(x => x.name === $('voice').value); if (v) u.voice = v;
+    let fired = false;
+    const fin = () => { if (fired) return; fired = true; clearTimeout(say.dog); speaking = false; i++; setTimeout(next, 180); };
+    u.onstart = () => { speaking = true; };
+    u.onboundary = () => { burst = performance.now() + 90; };
+    u.onend = fin;
+    u.onerror = e => { if (e.error === 'interrupted' || e.error === 'canceled') { fired = true; clearTimeout(say.dog); speaking = false; return; } fin(); };
+    speaking = true;   /* 목소리 엔진이 시작 신호를 늦게 줘도 입은 바로 움직이게 */
+    clearTimeout(say.dog); say.dog = setTimeout(fin, Math.max(4000, parts[i].length * 260));   /* 끝 신호가 안 오면 다음 문장으로 */
+    speechSynthesis.speak(u);
+    /* 크롬은 긴 문장 도중 멈추는 일이 있어 살짝 깨워 줌 */
+    clearInterval(say.keep); say.keep = setInterval(() => { if (speechSynthesis.speaking) { speechSynthesis.pause(); speechSynthesis.resume(); } }, 9000);
+  };
+  next();
+}
+function stopSpeak(silent){ try { speechSynthesis.cancel(); } catch (e) {} clearInterval(say.keep); clearTimeout(say.dog); speaking = false; if (!silent) mode('idle'); }
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------- 묻기 ---------- */
+function ask(q){
+  q = String(q || '').trim(); if (!q || busy) return;
+  busy = true; mic.disabled = true; mode('think');
+  heard.innerHTML = `묻는 말: <b>${esc(q)}</b>`;
+  subEl.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>';
+  st.textContent = '';
+  fetch(AI_URL, { method:'POST', body: JSON.stringify({ mode:'chat', q, code, hist }) }).then(r => r.json()).then(j => {
+    busy = false; mic.disabled = false;
+    if (!j.ok) { say(j.error || '대답할 수 없소.'); st.textContent = j.detail ? '연결 문제: ' + j.detail : ''; return; }
+    hist.push({ role:'me', text:q }, { role:'ai', text:j.say }); hist = hist.slice(-8);
+    say(j.say);
+  }).catch(() => { busy = false; mic.disabled = false; say('소리가 끊겼소. 다시 말해 주시오.'); });
+}
+function listen(){
+  if (!SR) { st.textContent = '이 브라우저는 음성 인식을 지원하지 않습니다. 크롬을 쓰거나 글로 물어 주세요.'; return; }
+  if (listening) { try { rec.stop(); } catch (e) {} return; }
+  if (busy) return;
+  stopSpeak(true);
+  rec = new SR(); rec.lang = 'ko-KR'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+  let fin = '';
+  rec.onstart = () => { listening = true; mic.classList.add('on'); mode('listen'); heard.innerHTML = '듣고 있소…'; subEl.innerHTML = ''; };
+  rec.onresult = ev => { let mid = ''; fin = ''; for (let i = 0; i < ev.results.length; i++) { const r = ev.results[i]; if (r.isFinal) fin += r[0].transcript; else mid += r[0].transcript; } heard.innerHTML = `묻는 말: <b>${esc(fin + mid)}</b>`; };
+  rec.onerror = ev => { st.textContent = ev.error === 'not-allowed' || ev.error === 'service-not-allowed' ? '마이크가 막혀 있습니다. 주소창 왼쪽 아이콘에서 마이크를 허용해 주세요.' : ev.error === 'no-speech' ? '아무 말도 들리지 않았소. 다시 눌러 말해 보시오.' : '음성 인식 오류: ' + ev.error; };
+  rec.onend = () => { listening = false; mic.classList.remove('on'); if (fin.trim()) ask(fin); else if (!busy) mode('idle'); };
+  try { rec.start(); } catch (e) {}
+}
+mic.addEventListener('click', listen);
+$('tf').addEventListener('submit', e => { e.preventDefault(); const v = $('tq').value; $('tq').value = ''; ask(v); });
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) listen(); }
+  if (e.key === 'Escape') { stopSpeak(); subEl.innerHTML = ''; }
+});
+
+/* ---------- 방 연결 ---------- */
+function linkRoom(){
+  code = $('code').value.trim().toUpperCase();
+  if (!code) { $('room').textContent = ''; return; }
+  fetch('/api/game?action=state&code=' + encodeURIComponent(code) + '&_=' + Date.now(), { cache:'no-store' }).then(r => r.json()).then(j => {
+    if (!j.ok) { $('room').textContent = '방을 찾을 수 없음'; code = ''; return; }
+    const R = j.room; $('room').textContent = `연결됨 · 사건 ${R.turn + 1}/${R.total} · 의정부 ${R.teams.length}곳`;
+    const u = new URL(location.href); u.searchParams.set('code', code); history.replaceState(null, '', u);
+  }).catch(() => { $('room').textContent = '연결 실패'; });
+}
+$('link').addEventListener('click', linkRoom); $('code').addEventListener('keydown', e => { if (e.key === 'Enter') linkRoom(); });
+if (code) linkRoom();
+setInterval(() => { if (code) linkRoom(); }, 30000);
+
+$('go').addEventListener('click', () => {
+  $('gate').remove();
+  say('사헌부 대사헌이오. 나라의 잘잘못을 따지는 것이 내 일이오. 궁금한 것이 있으면 무엇이든 물어보시오.');
+});
+</script>
+</body>
+</html>

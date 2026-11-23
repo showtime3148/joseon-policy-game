@@ -97,6 +97,48 @@ function fallback(step, targets) {
   return { say: `대감의 뜻을 잘 알겠소. 덕 보는 이와 손해 보는 이를 함께 헤아리는 것이 나랏일이오. 문답을 기록해 두겠소.`, grade: '' };
 }
 
+/* 대사헌 전용 화면: 선생님·학생이 말로 묻고 대사헌이 말로 답하는 자유 대화 */
+const CHAT_SYSTEM = `너는 조선의 사헌부 대사헌이다. 지금 고등학교 역사 수업 교실의 큰 화면 속에 나와, 선생님과 학생들이 말로 묻는 것에 말로 답한다.
+수업은 '조선 국정 회의'라는 게임이다. 모둠마다 의정부(영의정과 6조 판서)가 되어 조선 후기의 사건(임진왜란, 광해군의 중립 외교, 수원 화성, 홍경래의 난, 강화도 조약, 갑신정변, 동학 농민 운동)에 맞서 정책을 고른다.
+말투: "~하오", "~이오", "~소이다" 같은 사극 말투를 쓰되 고등학생이 바로 알아듣는 쉬운 낱말을 쓴다. 위엄 있지만 유머가 있고 다정하다.
+규칙:
+- 소리 내어 읽을 답이므로 2~4문장, 150자 안팎으로 짧게 답한다. 목록, 기호, 이모지, 괄호, 영어를 쓰지 않는다. 숫자는 한글로 읽기 쉽게 쓴다.
+- 역사 사실은 정확하게 말하고, 모르는 것은 모른다고 한다. 지어내지 않는다.
+- 지금 진행 중인 사건의 정답(실제 역사에서 무엇을 했는지)이나 어느 정책이 점수가 높은지는 결과 공개 전에는 알려 주지 않는다. 대신 생각할 거리를 되묻는다.
+- 학생이 장난을 쳐도 재치 있게 받아 주고 수업으로 이끈다. 욕설, 혐오, 개인 정보, 수업과 동떨어진 위험한 이야기는 정중히 사양한다.
+- 너는 대사헌 역할을 하는 AI라는 사실을 숨기지 않는다. 누가 물으면 그렇게 말한다.`;
+
+function roomBrief(r) {
+  if (!r) return '';
+  const turn = ERA.turns[Math.min(r.turn, ERA.turns.length - 1)];
+  const phase = { lobby: '모둠이 입장하는 중', deciding: '정책을 논의하는 중(결과 공개 전)', revealed: '이번 사건 결과를 공개한 뒤', ended: '게임이 끝난 뒤' }[r.phase] || r.phase;
+  const teams = (r.order || []).map(id => r.teams[id]).filter(Boolean).map(t => t.name).join(', ');
+  let s = `지금 수업 상황: ${phase}. 사건 ${r.turn + 1}/${ERA.turns.length} ${turn.year}년 ${turn.reign} 「${turn.title}」 — ${turn.text}`;
+  if (teams) s += `\n참여한 의정부: ${teams}`;
+  if (r.phase === 'revealed' || r.phase === 'ended') s += `\n결과가 공개되었으니 실제 역사를 이야기해도 된다: ${turn.real.text}`;
+  return s;
+}
+async function chat(req, d) {
+  const day = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  if (URL_ && TOKEN) {
+    const [n] = await redis([['INCR', 'aichat_' + day], ['EXPIRE', 'aichat_' + day, '172800']]);
+    if (n > 1500) return { ok: false, error: '오늘은 대사헌이 너무 지쳤소. 내일 다시 오시오.' };
+  }
+  const q = cut(d.q, 300);
+  if (q.length < 1) return { ok: false, error: '질문이 들리지 않았소.' };
+  let brief = '';
+  const code = String(d.code || '').toUpperCase();
+  if (code && URL_ && TOKEN) { try { const [raw] = await redis([['GET', 'room_' + code]]); if (raw) brief = roomBrief(JSON.parse(raw)); } catch (e) {} }
+  const hist = (Array.isArray(d.hist) ? d.hist : []).slice(-6).map(h => (h.role === 'ai' ? '대사헌: ' : '묻는 이: ') + cut(h.text, 300)).join('\n');
+  const user = `${brief ? brief + '\n\n' : ''}${hist ? '앞선 대화:\n' + hist + '\n\n' : ''}지금 들은 말: ${q}\n\n대사헌으로서 답하라. 답만 말하라.`;
+  try {
+    const say = cut(await askModel(req, CHAT_SYSTEM, user), 500).replace(/^대사헌\s*[:：]\s*/, '');
+    return { ok: true, say: say };
+  } catch (e) {
+    return { ok: false, error: '대사헌이 지금은 대답할 수 없소. 선생님, AI 연결을 확인해 주시오.', detail: cut(e.message, 160) };
+  }
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
   const send = o => res.status(200).json(o);
@@ -114,6 +156,7 @@ module.exports = async (req, res) => {
     if (typeof d === 'string') { try { d = JSON.parse(d); } catch (e) { return send({ ok: false, error: '요청 형식 오류' }); } }
     d = d || {};
     if (!URL_ || !TOKEN) return send({ ok: false, error: '서버 저장소가 연결되지 않았습니다.' });
+    if (d.mode === 'chat') return send(await chat(req, d));
     const code = String(d.code || '').toUpperCase();
     const [raw] = await redis([['GET', 'room_' + code]]);
     if (!raw) return send({ ok: false, error: '방을 찾을 수 없습니다.' });
