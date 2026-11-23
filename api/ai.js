@@ -106,7 +106,7 @@ module.exports = async (req, res) => {
       if (q.action === 'ping') {  /* 배포 뒤 AI 연결 확인용 */
         const t0 = Date.now();
         try { const s = await askModel(req, '한 단어로만 답하라.', '"준비" 라고만 말하라.'); return send({ ok: true, model: process.env.ANTHROPIC_API_KEY ? CLAUDE_MODEL : MODEL, auth: process.env.ANTHROPIC_API_KEY ? 'claude-api' : process.env.AI_GATEWAY_API_KEY ? 'key' : (req.headers['x-vercel-oidc-token'] ? 'oidc-header' : (process.env.VERCEL_OIDC_TOKEN ? 'oidc-env' : 'none')), reply: s, ms: Date.now() - t0 }); }
-        catch (e) { return send({ ok: false, model: process.env.ANTHROPIC_API_KEY ? CLAUDE_MODEL : MODEL, claudeKey: !!process.env.ANTHROPIC_API_KEY, keyShape: process.env.ANTHROPIC_API_KEY ? (String(process.env.ANTHROPIC_API_KEY).trim().slice(0, 7) + '… 길이 ' + String(process.env.ANTHROPIC_API_KEY).trim().length) : '', error: String(e.message || e), hasHeader: !!(req.headers && req.headers['x-vercel-oidc-token']), hasEnv: !!process.env.VERCEL_OIDC_TOKEN }); }
+        catch (e) { return send({ ok: false, model: process.env.ANTHROPIC_API_KEY ? CLAUDE_MODEL : MODEL, claudeKey: !!process.env.ANTHROPIC_API_KEY, keyOk: /^sk-ant-/.test(String(process.env.ANTHROPIC_API_KEY || '').trim()), error: String(e.message || e), hasHeader: !!(req.headers && req.headers['x-vercel-oidc-token']), hasEnv: !!process.env.VERCEL_OIDC_TOKEN }); }
       }
       return send({ ok: true, msg: 'AI 신하 문답 서버' });
     }
