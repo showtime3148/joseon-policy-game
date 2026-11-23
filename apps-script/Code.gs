@@ -662,6 +662,7 @@ function doGet(e) {
   if (p.action === 'state') {
     const r = getRoom(String(p.code || '').toUpperCase());
     if (!r) return out({ ok: false, error: '방을 찾을 수 없습니다. 코드를 확인하세요.' });
+    if (r.closed) return out({ ok: false, closed: true, error: '선생님이 종료한 방입니다.' });
     if (p.ver && Number(p.ver) === r.ver) return out({ ok: true, same: true, ver: r.ver });
     const pub = publicRoom(r);
     // 우리 모둠의 제안과 합의안은 같은 모둠원에게만
@@ -705,6 +706,7 @@ function handle(d) {
   const r = getRoom(code);
   if (!r) return { ok: false, error: '방을 찾을 수 없습니다. 코드를 확인하세요.' };
 
+  if (r.closed && d.action !== 'host') return { ok: false, closed: true, error: '선생님이 종료한 방입니다.' };
   if (d.action === 'join') {
     const name = txt(d.team, 20), who = txt(d.name, 20);
     if (!name) return { ok: false, error: '모둠 이름을 입력하세요.' };
@@ -748,6 +750,13 @@ function handle(d) {
       putRoom(r, true);
       return { ok: true };
     }
+    if (d.cmd === 'close') {
+      // 방 종료: 학생 접속을 끊고 더 이상 들어올 수 없게 함(기록은 그대로 보관)
+      r.closed = true; r.closedAt = Date.now();
+      putRoom(r, true);
+      return { ok: true };
+    }
+    if (r.closed) return { ok: false, error: '이미 종료한 방입니다.' };
     if (d.cmd === 'end') {
       // 수업 시간에 맞춰 중간에 끝내기: 열려 있던 사건은 결과 없이 닫고 최종 결과로
       if (r.phase === 'ended') return { ok: true };

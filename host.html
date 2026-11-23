@@ -53,13 +53,14 @@ let H=load(), room=null, ver=0, shown='', timer=null, tick=null;
 function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(H)); }catch(e){} }
 function joinUrl(){ return location.origin + location.pathname.replace(/host\.html$/,''); }
+function markClosed(code, yes){ if(!yes) return; (H.past||[]).forEach(p=>{ if(p.code===code) p.closed=true; }); save(); }
 function fail(m){ const e=document.getElementById('err'); if(e) e.textContent=m; }
 
 function poll(){
   clearTimeout(timer);
   if(!H.code) return;
   API.state(H.code, ver).then(j=>{ setConn(true);
-    if(!j.ok){ if(/찾을 수 없/.test(j.error||'')){ H={past:H.past||[]}; save(); room=null; render(); } return; }
+    if(!j.ok){ if(/찾을 수 없|종료한 방/.test(j.error||'')){ markClosed(H.code, j.closed); H={past:H.past||[]}; save(); room=null; render(); } return; }
     if(j.same){ runBots(room); return; } room=j.room; ver=room.ver; render(); runBots(room);
   }).catch(()=>setConn(false)).finally(()=>{ timer=setTimeout(poll, 2000); });
 }
@@ -98,7 +99,8 @@ function ctlHTML(){
     right=`<button class="btn primary big" data-cmd="open">${last?'최종 결과 보기':'다음 사건 열기'}</button>`; }
   if(room.phase==='ended'){ const f=room.teams.reduce((a,t)=>a+t.members.filter(m=>m.final).length,0); left=`<span class="pill navy" style="font-size:15px">성찰 제출 ${f}/${P}명</span>`; right=`<button class="btn" data-act="newroom">새 방 만들기</button>`; }
   const ex = DEMO||room.phase==='lobby' ? '' : `<button class="btn" data-act="export">기록 내려받기(엑셀)</button>`;
-  const endb = room.phase==='deciding'||room.phase==='revealed' ? `<button class="btn" data-act="endask" style="border-color:var(--bad);color:var(--bad)">게임 끝내기</button>` : '';
+  const endb = (room.phase==='deciding'||room.phase==='revealed' ? `<button class="btn" data-act="endask" style="border-color:var(--bad);color:var(--bad)">게임 끝내기</button>` : '')
+    + `<button class="btn" data-act="closeask" data-code="${room.code}" data-key="${H.hostKey}" style="border-color:var(--bad);color:var(--bad)">방 종료</button>`;
   return `<div class="row">${left}${ex}<span class="small" id="hmsg" style="color:var(--bad)"></span></div><div class="row">${endb}${right}</div>`;
 }
 function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const e=document.getElementById('timer'); if(!e||!room||!room.openedAt) return;
@@ -127,7 +129,7 @@ function vSetup(){
         <button class="btn primary big" data-act="create" style="align-self:flex-end">방 만들기</button></div>
       <div class="err" id="err"></div></div>
     ${!DEMO&&(H.past||[]).length?`<div class="card stack"><h3 style="font-size:18px">지난 방 기록 <span class="small muted" style="font-family:var(--body)">이 컴퓨터에서 만든 방 · 30일 동안 보관</span></h3>
-      <div class="tw"><table class="t"><thead><tr><th>방 코드</th><th>학급</th><th>만든 날</th><th></th></tr></thead><tbody>${H.past.map(p=>`<tr><td class="num"><b>${p.code}</b></td><td>${esc(p.cls||'')}</td><td class="num">${new Date(p.at).toLocaleString('ko-KR')}</td><td><button class="btn" data-act="export" data-code="${p.code}" data-key="${p.hostKey}">기록 내려받기(엑셀)</button></td></tr>`).join('')}</tbody></table></div>
+      <div class="tw"><table class="t"><thead><tr><th>방 코드</th><th>학급</th><th>만든 날</th><th></th></tr></thead><tbody>${H.past.map(p=>`<tr><td class="num"><b>${p.code}</b></td><td>${esc(p.cls||'')}</td><td class="num">${new Date(p.at).toLocaleString('ko-KR')}</td><td><div class="row" style="gap:6px"><button class="btn" data-act="export" data-code="${p.code}" data-key="${p.hostKey}">기록 내려받기(엑셀)</button>${p.closed?'<span class="pill">종료됨</span>':`<button class="btn" data-act="closeask" data-code="${p.code}" data-key="${p.hostKey}" style="border-color:var(--bad);color:var(--bad)">방 종료</button>`}</div></td></tr>`).join('')}</tbody></table></div>
       <span class="small" id="hmsg" style="color:var(--bad)"></span></div>`:''}
     <details class="card"><summary style="cursor:pointer;font-weight:700">수업 진행 방법</summary><ol>
       <li>방을 만들면 네 글자 방 코드가 나옵니다. 교실 화면에 띄워 두세요.</li>
@@ -222,6 +224,13 @@ document.addEventListener('click', e=>{
   const t=e.target.closest('[data-act],[data-cmd]'); if(!t||t.disabled) return;
   if(t.dataset.cmd) return cmd(t.dataset.cmd, t);
   const a=t.dataset.act;
+  if(a==='closeask'){ const c=t.dataset.code, k=t.dataset.key, cur=room&&room.code===c;
+    openModal(`<div class="mh"><div><small>방 종료</small><h2>방 ${esc(c)}을(를) 종료할까요?</h2></div><button class="x" data-close aria-label="닫기">✕</button></div>
+      <div class="mbody"><p>종료하면 이 방에 접속한 학생 화면이 모두 끊기고, 이 방 코드로는 더 이상 들어올 수 없습니다.</p>${cur&&room.phase!=='ended'?'<p class="note">아직 성찰을 제출하지 않은 학생이 있다면 먼저 <b>게임 끝내기</b>로 성찰을 받은 뒤 종료하세요.</p>':''}<p class="small muted">지금까지의 기록은 30일 동안 보관되어 '지난 방 기록'에서 엑셀로 내려받을 수 있습니다. 종료한 방은 다시 열 수 없습니다.</p></div>
+      <div class="mf"><button class="btn" data-close>취소</button><button class="btn primary" data-act="closenow" data-code="${esc(c)}" data-key="${esc(k)}">방 종료</button></div>`); return; }
+  if(a==='closenow'){ const c=t.dataset.code, k=t.dataset.key; t.disabled=true;
+    API.post({action:'host', code:c, hostKey:k, cmd:'close'}).then(j=>{ closeModal(); if(!j.ok){ alertBox(j.error); return; } markClosed(c, true);
+      if(H.code===c){ H={past:H.past||[]}; save(); room=null; ver=0; render(); } else { save(); render(); } }).catch(()=>{ closeModal(); alertBox('서버에 연결하지 못했습니다.'); }); return; }
   if(a==='endask'){ const n=room.phase==='revealed'?room.turn+1:room.turn;
     openModal(`<div class="mh"><div><small>게임 끝내기</small><h2>여기서 회의를 마칠까요?</h2></div><button class="x" data-close aria-label="닫기">✕</button></div>
       <div class="mbody"><p>지금까지 <b>${n}개 사건</b>의 결과로 최종 순위를 정하고, 학생 화면은 <b>성찰 쓰기</b>로 넘어갑니다.</p>${room.phase==='deciding'?'<p class="note">지금 열려 있는 사건은 결과 없이 닫힙니다.</p>':''}<p class="small muted">끝낸 뒤에는 다시 이어서 할 수 없습니다. 기록은 그대로 남아 엑셀로 내려받을 수 있습니다.</p></div>
