@@ -77,10 +77,11 @@ header{flex-wrap:wrap} header h1,header .sub,.cfg label{white-space:nowrap}
     <div class="ctrl"><button class="mic" id="mic" type="button" aria-label="말하기">🎤</button>
       <form class="txt" id="tf"><input id="tq" placeholder="말 대신 글로 물어도 되오" maxlength="300"><button type="submit">묻기</button></form></div>
     <div class="status" id="st"></div>
-    <div class="hint">마이크 버튼이나 <b>스페이스바</b>를 누르고 말하세요 · 말을 마치면 대사헌이 대답합니다 · Esc: 대답 멈추기</div>
+    <div class="hint">사건이 열리면 대사헌이 스스로 아뢰옵니다 · 마이크 버튼이나 <b>스페이스바</b>를 누르고 말하세요 · 말을 마치면 대사헌이 대답합니다 · Esc: 대답 멈추기</div>
   </div>
 </div>
-<div class="gate" id="gate"><div><h2>대사헌을 모시겠소?</h2><p>이 화면은 교실의 큰 화면이나 별도의 컴퓨터에 띄워 두는 대사헌 화면입니다.<br>스피커와 마이크가 있는 크롬 브라우저에서 가장 잘 작동합니다.<br>처음에 마이크 사용을 묻는 창이 뜨면 <b>허용</b>을 눌러 주세요.</p><button id="go" type="button">대사헌 입장</button></div></div>
+<div class="gate" id="gate"><div><h2>대사헌을 모시겠소?</h2><p>이 화면은 교실의 큰 화면이나 별도의 컴퓨터에 띄워 두는 대사헌 화면입니다.<br>방 코드를 연결해 두면 사건이 열리거나 돌발 사태가 생기거나 결과가 공개될 때 대사헌이 스스로 전하께 아룁니다.<br>스피커와 마이크가 있는 크롬 브라우저에서 가장 잘 작동합니다.<br>처음에 마이크 사용을 묻는 창이 뜨면 <b>허용</b>을 눌러 주세요.</p><button id="go" type="button">대사헌 입장</button></div></div>
+<script src="scenarios.js"></script>
 <script>
 /* ---------- 대사헌 그림 ---------- */
 function charSVG(){
@@ -200,12 +201,13 @@ function say(text, done){
   };
   next();
 }
-function stopSpeak(silent){ try { speechSynthesis.cancel(); } catch (e) {} clearInterval(say.keep); clearTimeout(say.dog); speaking = false; if (!silent) mode('idle'); }
+function stopSpeak(silent){ if (!silent) playing = false; try { speechSynthesis.cancel(); } catch (e) {} clearInterval(say.keep); clearTimeout(say.dog); speaking = false; if (!silent) mode('idle'); }
 function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 /* ---------- 묻기 ---------- */
 function ask(q){
   q = String(q || '').trim(); if (!q || busy) return;
+  playing = false;
   busy = true; mic.disabled = true; mode('think');
   heard.innerHTML = `묻는 말: <b>${esc(q)}</b>`;
   subEl.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>';
@@ -221,7 +223,7 @@ function listen(){
   if (!SR) { st.textContent = '이 브라우저는 음성 인식을 지원하지 않습니다. 크롬을 쓰거나 글로 물어 주세요.'; return; }
   if (listening) { try { rec.stop(); } catch (e) {} return; }
   if (busy) return;
-  stopSpeak(true);
+  playing = false; stopSpeak(true);
   rec = new SR(); rec.lang = 'ko-KR'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
   let fin = '';
   rec.onstart = () => { listening = true; mic.classList.add('on'); mode('listen'); heard.innerHTML = '듣고 있소…'; subEl.innerHTML = ''; };
@@ -238,23 +240,72 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { stopSpeak(); subEl.innerHTML = ''; }
 });
 
-/* ---------- 방 연결 ---------- */
+/* ---------- 방 연결 · 어전 보고 ---------- */
+let entered = false, prev = null, polling = 0, queue = [], playing = false;
+function phaseText(R){ return { lobby:'입장 중', deciding:'논의 중', revealed:'결과 공개', ended:'게임 끝' }[R.phase] || R.phase; }
 function linkRoom(){
   code = $('code').value.trim().toUpperCase();
+  prev = null;
   if (!code) { $('room').textContent = ''; return; }
+  const u = new URL(location.href); u.searchParams.set('code', code); history.replaceState(null, '', u);
+  poll(true);
+}
+function poll(first){
+  if (!code) return;
   fetch('/api/game?action=state&code=' + encodeURIComponent(code) + '&_=' + Date.now(), { cache:'no-store' }).then(r => r.json()).then(j => {
-    if (!j.ok) { $('room').textContent = '방을 찾을 수 없음'; code = ''; return; }
-    const R = j.room; $('room').textContent = `연결됨 · 사건 ${R.turn + 1}/${R.total} · 의정부 ${R.teams.length}곳`;
-    const u = new URL(location.href); u.searchParams.set('code', code); history.replaceState(null, '', u);
-  }).catch(() => { $('room').textContent = '연결 실패'; });
+    if (!j.ok) { $('room').textContent = j.closed ? '종료된 방' : '방을 찾을 수 없음'; if (j.closed && prev && !prev.closed) { prev.closed = true; enqueue('closed'); } return; }
+    const R = j.room;
+    $('room').textContent = `연결됨 · ${R.code} · 사건 ${Math.min(R.turn + 1, R.total)}/${R.total} · ${phaseText(R)} · 의정부 ${R.teams.length}곳`;
+    const now = { phase: R.phase, turn: R.turn, sur: R.sur && R.sur.id ? R.sur.id + '@' + R.sur.at : '' };
+    if (prev && entered) {
+      if (now.phase === 'deciding' && (prev.phase !== 'deciding' || prev.turn !== now.turn)) enqueue('event', R);
+      else if (now.phase === 'deciding' && now.sur && now.sur !== prev.sur) enqueue('surprise', R);
+      if (now.phase === 'revealed' && prev.phase !== 'revealed') enqueue('reveal', R, 5500);
+      if (now.phase === 'ended' && prev.phase !== 'ended') enqueue('end', R, 2000);
+    }
+    prev = now; window.__room = R;
+  }).catch(() => { $('room').textContent = '연결 끊김 · 다시 시도 중'; });
 }
 $('link').addEventListener('click', linkRoom); $('code').addEventListener('keydown', e => { if (e.key === 'Enter') linkRoom(); });
 if (code) linkRoom();
-setInterval(() => { if (code) linkRoom(); }, 30000);
+setInterval(() => { if (code) poll(); }, 2500);
+
+/* 보고할 말을 미리 받아 두고, 대사헌이 한가해지면 아뢴다 */
+function fallbackText(kind, R){
+  const t = ERA.turns[Math.min(R ? R.turn : 0, ERA.turns.length - 1)];
+  const rank = R ? R.teams.slice().sort((a, b) => b.score - a.score) : [];
+  if (kind === 'event') return `전하, 아뢰옵니다. ${t.year}년 ${t.reign}, ${t.title}의 일이옵니다. ${t.text} 의정부 대신들에게 지혜를 모으라 명하여 주시옵소서.`;
+  if (kind === 'surprise') { const s = surpriseById(R.sur.id) || {}; return `전하, 급히 아뢰옵니다. ${s.title || '돌발 사태'}이옵니다. ${s.text || ''}`; }
+  if (kind === 'reveal') { const ex = rank.filter(x => x.score < 40).map(x => x.name); return `전하, ${t.title}에 대한 결과를 아뢰옵니다. ${rank[0] ? rank[0].name + ' 의정부가 ' + rank[0].score + '점으로 으뜸이옵니다.' : ''} ${ex.length ? ex.join(', ') + ' 의정부는 귀양길에 오르게 되었사옵니다.' : ''} 실제 역사에서는 이러하였사옵니다. ${t.real.text}`; }
+  if (kind === 'end') return `전하, 국정 회의를 모두 마쳤사옵니다. ${rank[0] ? rank[0].name + ' 의정부가 ' + rank[0].score + '점으로 가장 나라를 잘 다스렸사옵니다.' : ''} 모든 대신의 노고를 치하하여 주시옵소서.`;
+  if (kind === 'closed') return '전하, 오늘의 조회가 파하였사옵니다. 신 대사헌은 이만 물러가겠사옵니다.';
+  return '사헌부 대사헌이옵니다. 사건이 일어나면 곧바로 아뢰고, 전하께서 물으시면 무엇이든 답하겠사옵니다.';
+}
+function enqueue(kind, R, delay){
+  const item = { kind, text: null, ready: false, at: Date.now() + (delay || 0) };
+  queue.push(item);
+  const body = { mode:'announce', code, kind, turn: R ? R.turn : 0, phase: R ? R.phase : '', sur: R && R.sur ? R.sur.id : '', teams: R ? R.teams.map(t => ({ name: t.name, score: t.score })) : [] };
+  const fb = fallbackText(kind, R);
+  if (kind === 'closed') { item.text = fb; item.ready = true; return; }
+  fetch(AI_URL, { method:'POST', body: JSON.stringify(body) }).then(r => r.json()).then(j => { item.text = j.ok && j.say ? j.say : fb; item.ready = true; })
+    .catch(() => { item.text = fb; item.ready = true; });
+  if (kind === 'event' || kind === 'surprise') { item.label = kind === 'event' ? '📜 사건 보고' : '⚡ 급보'; } else if (kind === 'reveal') item.label = '📜 결과 보고'; else if (kind === 'end') item.label = '📜 마지막 보고'; else item.label = '';
+}
+setInterval(() => {
+  if (playing || busy || listening || speaking || !queue.length) return;
+  const it = queue[0];
+  if (!it.ready || Date.now() < it.at) return;
+  queue.shift(); playing = true;
+  heard.innerHTML = it.label ? `<b>${it.label}</b>` : '';
+  if (it.kind === 'event' || it.kind === 'surprise') hist = [];
+  hist.push({ role:'ai', text: it.text }); hist = hist.slice(-8);
+  say(it.text, () => { playing = false; });
+}, 250);
 
 $('go').addEventListener('click', () => {
-  $('gate').remove();
-  say('사헌부 대사헌이오. 나라의 잘잘못을 따지는 것이 내 일이오. 궁금한 것이 있으면 무엇이든 물어보시오.');
+  $('gate').remove(); entered = true;
+  try { speechSynthesis.speak(new SpeechSynthesisUtterance(' ')); } catch (e) {}
+  enqueue('enter', window.__room || null);
 });
 </script>
 </body>

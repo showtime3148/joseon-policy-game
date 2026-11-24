@@ -874,5 +874,5 @@ function handle(d) {
   }
   return { ok: false, error: '알 수 없는 요청' };
 }
-return { doGet: doGet, doPost: doPost, HEADS: { '기록': LOG_HEAD, '제안': PROP_HEAD, '제출': FINAL_HEAD }, ERA: ERA, ROLES: ROLES, STATS: STATS };
+return { doGet: doGet, doPost: doPost, HEADS: { '기록': LOG_HEAD, '제안': PROP_HEAD, '제출': FINAL_HEAD }, ERA: ERA, ROLES: ROLES, STATS: STATS, surpriseById: surpriseById };
 };

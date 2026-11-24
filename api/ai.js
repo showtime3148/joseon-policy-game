@@ -6,7 +6,7 @@
  */
 const makeEngine = require('./_engine.js');
 const G = makeEngine(null, null, null, null);
-const ERA = G.ERA, ROLES = G.ROLES;
+const ERA = G.ERA, ROLES = G.ROLES, surpriseById = G.surpriseById;
 
 const URL_ = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
 const TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -100,7 +100,7 @@ function fallback(step, targets) {
 }
 
 /* 대사헌 전용 화면: 선생님·학생이 말로 묻고 대사헌이 말로 답하는 자유 대화 */
-const CHAT_SYSTEM = `너는 조선의 사헌부 대사헌이다. 지금 고등학교 역사 수업 교실의 큰 화면 속에 나와, 선생님과 학생들이 말로 묻는 것에 말로 답한다.
+const CHAT_SYSTEM = `너는 조선의 사헌부 대사헌이다. 지금 고등학교 역사 수업 교실의 큰 화면 속에 나와 있다. 수업을 이끄는 선생님은 이 자리의 임금, 곧 주상 전하이고, 학생들은 의정부의 대신들이다. 선생님이 물으면 "전하"라고 부르며 신하로서 아뢰듯 답하고, 학생이 물으면 "대감"이라 부른다. 누가 물었는지 모르면 전하께 아뢰듯 답한다.
 수업은 '조선 국정 회의'라는 게임이다. 모둠마다 의정부(영의정과 6조 판서)가 되어 조선 후기의 사건(임진왜란, 광해군의 중립 외교, 수원 화성, 홍경래의 난, 강화도 조약, 갑신정변, 동학 농민 운동)에 맞서 정책을 고른다.
 말투: "~하오", "~이오", "~소이다" 같은 사극 말투를 쓰되 고등학생이 바로 알아듣는 쉬운 낱말을 쓴다. 위엄 있지만 유머가 있고 다정하다.
 규칙:
@@ -120,6 +120,33 @@ function roomBrief(r) {
   if (r.phase === 'revealed' || r.phase === 'ended') s += `\n결과가 공개되었으니 실제 역사를 이야기해도 된다: ${turn.real.text}`;
   return s;
 }
+/* 대사헌 화면이 방의 변화를 보고 스스로 아뢰는 말: 새 사건, 돌발 사태, 결과 공개, 게임 끝 */
+function announcePrompt(d) {
+  const ti = Math.max(0, Math.min(ERA.turns.length - 1, Number(d.turn) || 0));
+  const turn = ERA.turns[ti];
+  const teams = (Array.isArray(d.teams) ? d.teams : []).slice(0, 8).map(t => ({ name: cut(t.name, 20), score: Number(t.score) || 0 }));
+  const rank = teams.slice().sort((a, b) => b.score - a.score).map((t, i) => `${i + 1}위 ${t.name} ${t.score}점`).join(', ');
+  const exiled = teams.filter(t => t.score < 40).map(t => t.name).join(', ');
+  if (d.kind === 'event') return `사건 ${ti + 1}/${ERA.turns.length}이 막 열렸다: ${turn.year}년 ${turn.reign} 「${turn.title}」 — ${turn.text}
+이 사건을 전하께 처음 아뢰는 보고를 하라. "전하, 아뢰옵니다"로 시작해 언제 무슨 일이 벌어졌고 무엇이 위태로운지 4~5문장으로 생생하게 고하고, 마지막 문장은 의정부 대신들에게 지혜를 모으라 명해 주시길 청하는 말로 끝맺어라. 실제 역사에서 무엇을 했는지는 말하지 마라. 250자 안팎.`;
+  if (d.kind === 'surprise') { const s = surpriseById(d.sur) || {}; return `지금 사건은 ${turn.year}년 「${turn.title}」이고 의정부가 논의하는 중인데, 돌발 사태가 벌어졌다: 「${s.title || ''}」 — ${s.text || ''}
+급히 달려와 전하께 돌발 사태를 아뢰라. "전하, 급히 아뢰옵니다"로 시작해 3문장 안팎, 다급한 말투로. 150자 안팎.`; }
+  if (d.kind === 'reveal') return `사건 「${turn.title}」(${turn.year})에 대한 의정부들의 결과가 공개되었다. 순위: ${rank || '없음'}. ${exiled ? '40점 아래로 떨어져 귀양 가게 된 의정부: ' + exiled + '.' : '귀양 가는 의정부는 없다.'}
+실제 역사: ${turn.real.text}
+전하께 결과를 아뢰라. 1등 의정부를 칭찬하고, 귀양 가는 의정부가 있으면 재치 있게 아뢰고, 실제 역사에서는 어떻게 했는지를 한두 문장으로 쉽게 전하라. 5문장 이내, 280자 안팎.`;
+  if (d.kind === 'end') return `모든 사건이 끝났다. 최종 순위: ${rank || '없음'}.
+전하께 국정 회의를 마치는 보고를 하라. 1등 의정부를 치하하고, 모든 대신의 노고를 위로하며, 오늘 배운 점을 한 문장으로 정리하라. 4문장, 220자 안팎.`;
+  if (d.kind === 'enter') return `${d.phase === 'lobby' ? '아직 사건이 열리기 전, 의정부들이 모이는 중이다.' : `지금 사건 ${ti + 1} 「${turn.title}」(${turn.year})을 다루는 중이다.`}
+대사헌으로서 방금 어전에 들어와 전하께 인사를 올려라. 자기소개와 함께, 사건이 열리면 아뢰고 무엇이든 물으시면 답하겠다고 2~3문장으로. 130자 안팎.`;
+  return '';
+}
+async function announce(req, d) {
+  const p = announcePrompt(d);
+  if (!p) return { ok: false, error: 'kind' };
+  try { return { ok: true, say: cut(await askModel(req, CHAT_SYSTEM, p), 600).replace(/^대사헌\s*[:：]\s*/, '') }; }
+  catch (e) { return { ok: false, error: 'ai', detail: cut(e.message, 200) }; }
+}
+
 async function chat(req, d) {
   const day = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
   if (URL_ && TOKEN) {
@@ -152,6 +179,7 @@ module.exports = async (req, res) => {
         try { const s = await askModel(req, '한 단어로만 답하라.', '"준비" 라고만 말하라.'); return send({ ok: true, model: process.env.ANTHROPIC_API_KEY ? CLAUDE_MODEL : MODEL, auth: process.env.ANTHROPIC_API_KEY ? 'claude-api' : process.env.AI_GATEWAY_API_KEY ? 'key' : (req.headers['x-vercel-oidc-token'] ? 'oidc-header' : (process.env.VERCEL_OIDC_TOKEN ? 'oidc-env' : 'none')), reply: s, ms: Date.now() - t0 }); }
         catch (e) { return send({ ok: false, model: process.env.ANTHROPIC_API_KEY ? CLAUDE_MODEL : MODEL, claudeKey: !!process.env.ANTHROPIC_API_KEY, keyOk: /^sk-ant-/.test(String(process.env.ANTHROPIC_API_KEY || '').trim()), error: String(e.message || e), hasHeader: !!(req.headers && req.headers['x-vercel-oidc-token']), hasEnv: !!process.env.VERCEL_OIDC_TOKEN }); }
       }
+      if (q.action === 'anntest') return send(await announce(req, { kind: q.kind || 'event', turn: Number(q.turn) || 0, sur: q.sur, teams: [{ name: '청렴', score: 62 }, { name: '귀양', score: 35 }] }));
       if (q.action === 'chattest') return send(await chat(req, { q: q.q || '대사헌, 임진왜란 때 이순신은 어떤 일을 했소?', code: q.code }));
       return send({ ok: true, msg: 'AI 신하 문답 서버' });
     }
@@ -160,6 +188,7 @@ module.exports = async (req, res) => {
     d = d || {};
     if (!URL_ || !TOKEN) return send({ ok: false, error: '서버 저장소가 연결되지 않았습니다.' });
     if (d.mode === 'chat') return send(await chat(req, d));
+    if (d.mode === 'announce') return send(await announce(req, d));
     const code = String(d.code || '').toUpperCase();
     const [raw] = await redis([['GET', 'room_' + code]]);
     if (!raw) return send({ ok: false, error: '방을 찾을 수 없습니다.' });
