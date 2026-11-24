@@ -52,12 +52,29 @@ function poll(){
   if(!L.code||!L.teamId) return;
   API.state(L.code, ver, L.teamId).then(j=>{
     setConn(true);
-    if(!j.ok){ if(/찾을 수 없|종료한 방/.test(j.error||'')){ const keep={teamName:L.teamName, name:L.name, roles:L.roles, notice:j.closed?'선생님이 방 '+L.code+'을(를) 종료했습니다. 새 방 코드를 받으면 다시 들어오세요.':''}; L=keep; save(); room=null; render(); } return; }
+    if(!j.ok){ if(j.closed||/찾을 수 없|종료한 방/.test(j.error||'')){ teardown(); const keep={teamName:L.teamName, name:L.name, roles:L.roles, notice:j.closed?'선생님이 방 '+L.code+'을(를) 종료했습니다. 새 방 코드를 받으면 다시 들어오세요.':''}; L=keep; save(); room=null; render(); } return; }
     if(j.same) return;
     room=j.room; ver=room.ver;
     if(!me()||!mine()){ L.teamId=null; save(); room=null; render(); return; }
     render();
   }).catch(()=>setConn(false)).finally(()=>{ timer=setTimeout(poll, 2500); });
+}
+/* 방 종료·게임 끝: 떠 있는 창(정책 창, 대사헌 문답, 귀양, 돌발)과 소리·마이크를 모두 닫는다 */
+function teardown(){
+  try{ if(typeof qaClose==='function') qaClose(); }catch(e){}
+  ['modal','qa','exile','endov'].forEach(id=>{ const e=document.getElementById(id); if(e) e.remove(); });
+  try{ speechSynthesis.cancel(); }catch(e){}
+  clearTimeout(typeof exTimer!=='undefined'?exTimer:0);
+  editing=false;
+}
+function endOverlay(){
+  const el=document.createElement('div'); el.id='endov'; el.className='ex-bg';
+  el.setAttribute('role','dialog'); el.setAttribute('aria-modal','true');
+  el.innerHTML=`<div class="ex-box" style="max-width:520px"><div class="ex-head"><span class="ex-stamp">罷朝</span><div><small>선생님이 게임을 끝냈습니다</small><h2>국정 회의 종료</h2></div></div>
+    <p style="padding:16px 20px 0;margin:0;font-size:17px;line-height:1.6">더 이상 정책을 고르거나 상신할 수 없습니다. 최종 결과를 확인하고, 성찰을 작성해 제출하세요.</p>
+    <button class="btn primary" type="button" data-endok>최종 결과 보기</button></div>`;
+  document.body.appendChild(el);
+  el.querySelector('[data-endok]').addEventListener('click',()=>el.remove());
 }
 function key(){ const t=me(), m=mine(); return [room.phase, room.turn, room.mySub?1:0, m.final?1:0, editing?1:0, m.roles.join('')].join(':'); }
 function render(){
@@ -66,7 +83,9 @@ function render(){
   document.getElementById('who').textContent = t.name+' 의정부 · '+m.name+' ('+m.roles.map(r=>roleById(r).name).join('·')+') · 방 '+room.code;
   const k=key();
   if(k===shown){ liveUpdate(); return; }
+  const wasEnded=shown&&shown.split(':')[0]==='ended';
   shown=k;
+  if(room.phase==='ended'&&!wasEnded){ teardown(); endOverlay(); }
   ({lobby:vLobby, deciding:vDecide, revealed:vReveal, ended:vEnd})[room.phase]();
   window.scrollTo(0,0);
   if(room.phase==='deciding') surAlert();
