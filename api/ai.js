@@ -150,6 +150,7 @@ module.exports = async (req, res) => {
         try { const s = await askModel(req, '한 단어로만 답하라.', '"준비" 라고만 말하라.'); return send({ ok: true, model: process.env.ANTHROPIC_API_KEY ? CLAUDE_MODEL : MODEL, auth: process.env.ANTHROPIC_API_KEY ? 'claude-api' : process.env.AI_GATEWAY_API_KEY ? 'key' : (req.headers['x-vercel-oidc-token'] ? 'oidc-header' : (process.env.VERCEL_OIDC_TOKEN ? 'oidc-env' : 'none')), reply: s, ms: Date.now() - t0 }); }
         catch (e) { return send({ ok: false, model: process.env.ANTHROPIC_API_KEY ? CLAUDE_MODEL : MODEL, claudeKey: !!process.env.ANTHROPIC_API_KEY, keyOk: /^sk-ant-/.test(String(process.env.ANTHROPIC_API_KEY || '').trim()), error: String(e.message || e), hasHeader: !!(req.headers && req.headers['x-vercel-oidc-token']), hasEnv: !!process.env.VERCEL_OIDC_TOKEN }); }
       }
+      if (q.action === 'chattest') return send(await chat(req, { q: q.q || '대사헌, 임진왜란 때 이순신은 어떤 일을 했소?', code: q.code }));
       return send({ ok: true, msg: 'AI 신하 문답 서버' });
     }
     let d = req.body;
