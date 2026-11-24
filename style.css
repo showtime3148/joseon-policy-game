@@ -507,3 +507,4 @@ button.sxopt{cursor:pointer} button.sxopt:hover{border-color:#8c2d1e}
 .cdbar.warn{background:#8a5a12} .cdbar.warn .cd-track i{background:#f3c35a}
 .cdbar.warn .cd-t{animation:exPulse 1s infinite}
 .cdbar.over{background:#9b2a2a} .cdbar.over .cd-track i{background:#fff}
+#leave{background:transparent;color:#f5ecd8;border:1px solid rgba(245,236,216,.45)} #leave:hover{background:rgba(255,255,255,.12)}
