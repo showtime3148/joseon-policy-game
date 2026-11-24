@@ -38,11 +38,13 @@ async function askClaude(system, user) {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', signal: ctl.signal,
       headers: { 'x-api-key': String(process.env.ANTHROPIC_API_KEY).trim().replace(/^["']|["']$/g, ''), 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 400, system: system, messages: [{ role: 'user', content: user }] })
+      body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 1500, system: system, messages: [{ role: 'user', content: user }] })
     });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error('claude ' + r.status + ' ' + cut(j && j.error && (j.error.message || j.error.type), 200));
-    return (j.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
+    const txt = (j.content || []).filter(c => c.type === 'text').map(c => c.text).join('').trim();
+    if (!txt) throw new Error('empty ' + j.stop_reason + ' ' + (j.content || []).map(c => c.type).join(','));
+    return txt;
   } finally { clearTimeout(tm); }
 }
 async function askModel(req, system, user) {
@@ -135,7 +137,7 @@ async function chat(req, d) {
     const say = cut(await askModel(req, CHAT_SYSTEM, user), 500).replace(/^대사헌\s*[:：]\s*/, '');
     return { ok: true, say: say };
   } catch (e) {
-    return { ok: false, error: '대사헌이 지금은 대답할 수 없소. 선생님, AI 연결을 확인해 주시오.', detail: cut(e.message, 160) };
+    return { ok: false, error: '대사헌이 지금은 대답할 수 없소. 선생님, AI 연결을 확인해 주시오.', detail: cut(e.message, 200) };
   }
 }
 
