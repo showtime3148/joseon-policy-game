@@ -1,7 +1,7 @@
 /* 학생 화면·교사 화면 공통 */
 function serverUrl(){ try{ const q=new URLSearchParams(location.search); if(q.get('demo')) return ''; const o=q.get('server'); if(o) return o; if(location.protocol==='file:') return ''; }catch(e){} return SERVER_URL; }
 const API = {
-  state(code, ver, team){ return fetch(serverUrl()+'?action=state&code='+encodeURIComponent(code)+(ver?'&ver='+ver:'')+(team?'&team='+team:'')+'&_='+Date.now(), {cache:'no-store'}).then(r=>r.json()); },
+  state(code, ver, team){ return fetch(serverUrl()+'?action=state&code='+encodeURIComponent(code)+(ver?'&ver='+ver:'')+(team?'&team='+team:'')+'&_='+Date.now(), {cache:'no-store'}).then(r=>r.json()).then(j=>{ if(j&&j.room&&j.room.now) SRV_OFF=j.room.now-Date.now(); return j; }); },
   post(d){ return fetch(serverUrl(), {method:'POST', body:JSON.stringify(d)}).then(r=>r.json()); }
 };
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -108,4 +108,30 @@ function myBonusHTML(turn, l){
   const rows = (l.syn || []).map(i => turn.combos[i]).map(c => `<div class="mbr ${c.good ? 'good' : 'bad'}"><b>${c.good ? '🔗' : '⚡'} ${esc(c.name)}</b><span>${c.bonus > 0 ? '+' : ''}${c.bonus}</span></div>`);
   if (l.full) rows.push(`<div class="mbr good"><b>🏛 6조 전원 참여</b><span>+${FULL_BONUS}</span></div>`);
   return `<div class="mybonus"><div class="mbh">협력 보너스 <b class="${l.bonus >= 0 ? 'up' : 'dn'}">${l.bonus > 0 ? '+' : ''}${l.bonus || 0}점</b></div>${rows.join('') || '<p class="small muted" style="margin:0">이번에는 맞물린 정책이 없었습니다. 아래 시너지 도감을 보고 다음 사건에서 다른 조와 손발을 맞춰 보세요.</p>'}</div>`;
+}
+
+
+/* ---------- 의논 타이머 (사건마다 5분) ---------- */
+var SRV_OFF = 0;
+function cdLeft(r){ if(!r||r.phase!=='deciding'||!r.tEnd) return null; return Math.max(0, Math.ceil((r.tEnd-(Date.now()+SRV_OFF))/1000)); }
+function cdFmt(sec){ return String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0'); }
+function cdInit(host, noBtn){
+  if(document.getElementById('cdbar')) return;
+  const el=document.createElement('div'); el.id='cdbar'; el.className='cdbar'+(host?' host':''); el.hidden=true;
+  el.setAttribute('role','timer'); el.setAttribute('aria-live','off');
+  el.innerHTML=`<div class="cd-in"><span class="cd-ico">⏳</span><span class="cd-lb">모둠 의논 시간</span><b class="cd-t" id="cdt">05:00</b><div class="cd-track"><i id="cdfill"></i></div><span class="cd-msg" id="cdmsg"></span>${host&&!noBtn?'<span class="cd-btns"><button type="button" class="btn" data-tmr="sub">−1분</button><button type="button" class="btn" data-tmr="add">+1분</button><button type="button" class="btn" data-tmr="reset">다시 5분</button></span>':''}</div>`;
+  const top=document.querySelector('header.top'); if(top) top.appendChild(el); else document.body.prepend(el);
+  let last=-1;
+  setInterval(()=>{
+    const r=typeof room!=='undefined'?room:null, left=cdLeft(r);
+    if(left==null){ el.hidden=true; return; }
+    el.hidden=false;
+    const total=Math.max(DISCUSS_SEC, Math.round((r.tEnd-r.openedAt)/1000)||DISCUSS_SEC);
+    document.getElementById('cdt').textContent=cdFmt(left);
+    document.getElementById('cdfill').style.width=(100*left/total).toFixed(1)+'%';
+    el.classList.toggle('warn', left>0&&left<=60); el.classList.toggle('over', left===0);
+    document.getElementById('cdmsg').textContent= left===0 ? (host?'의논 시간 종료 · 결과를 공개하세요':'시간 종료! 영의정은 결정을 상신하세요') : left<=60 ? '1분 남았습니다 · 결정을 마무리하세요' : '';
+    if(last>60&&left<=60||last>0&&left===0){ try{ navigator.vibrate&&navigator.vibrate(200); }catch(e){} }
+    last=left;
+  }, 250);
 }

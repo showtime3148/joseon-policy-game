@@ -79,7 +79,7 @@ function canDecide(t, m) { return m.roles.indexOf('yeong') >= 0 || !hasRole(t, '
 
 function publicRoom(r) {
   return {
-    code: r.code, cls: r.cls, phase: r.phase, turn: r.turn, total: TOTAL, ver: r.ver, openedAt: r.openedAt || null,
+    code: r.code, cls: r.cls, phase: r.phase, turn: r.turn, total: TOTAL, ver: r.ver, openedAt: r.openedAt || null, tEnd: r.tEnd || null, now: Date.now(),
     sur: !r.sur ? null : r.sur.fired ? { id: r.sur.id, at: r.sur.at } : { pending: true, delay: r.sur.delay },
     teams: r.order.map(id => {
       const t = r.teams[id], g = t.game;
@@ -179,8 +179,18 @@ function handle(d) {
         else { r.turn++; r.phase = 'deciding'; }
       } else return { ok: false, error: '지금은 다음 단계로 넘어갈 수 없습니다.' };
       r.openedAt = Date.now();
+      r.tEnd = r.phase === 'deciding' ? r.openedAt + DISCUSS_SEC * 1000 : null;
       r.sur = null;
       if (r.phase === 'deciding') { r.order.forEach(id => { r.teams[id].sresp = null; }); if (Math.random() < SURPRISE_RATE) r.sur = pickSurprise(r); }
+      putRoom(r, true);
+      return { ok: true };
+    }
+    if (d.cmd === 'timer') {   // 의논 타이머: +1분 / -1분 / 다시 5분
+      if (r.phase !== 'deciding') return { ok: false, error: '논의 중일 때만 타이머를 바꿀 수 있습니다.' };
+      const now = Date.now(), base = Math.max(now, r.tEnd || now);
+      if (d.op === 'add') r.tEnd = base + 60000;
+      else if (d.op === 'sub') r.tEnd = Math.max(now, base - 60000);
+      else r.tEnd = now + DISCUSS_SEC * 1000;
       putRoom(r, true);
       return { ok: true };
     }

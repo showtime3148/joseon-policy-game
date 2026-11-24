@@ -50,9 +50,12 @@ main{max-width:1500px}
 <script>
 const KEY='joseon-host-v3';
 const $app=document.getElementById('app');
-let H=load(), room=null, ver=0, shown='', timer=null, tick=null;
+/* 참관 모드: host.html?watch=방코드 — 교사 화면을 그대로 보되 조작은 못 한다 */
+const WATCH=(new URLSearchParams(location.search).get('watch')||'').trim().toUpperCase();
+let H=WATCH?{code:WATCH}:load(), room=null, ver=0, shown='', timer=null, tick=null;
 function load(){ try{ return JSON.parse(localStorage.getItem(KEY))||{}; }catch(e){ return {}; } }
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(H)); }catch(e){} }
+function save(){ if(WATCH) return; try{ localStorage.setItem(KEY, JSON.stringify(H)); }catch(e){} }
+function watchUrl(){ return location.origin + location.pathname + '?watch=' + (room?room.code:''); }
 function joinUrl(){ return location.origin + location.pathname.replace(/host\.html$/,''); }
 function markClosed(code, yes){ if(!yes) return; (H.past||[]).forEach(p=>{ if(p.code===code) p.closed=true; }); save(); }
 function fail(m){ const e=document.getElementById('err'); if(e) e.textContent=m; }
@@ -61,13 +64,14 @@ function poll(){
   clearTimeout(timer);
   if(!H.code) return;
   API.state(H.code, ver).then(j=>{ setConn(true);
-    if(!j.ok){ if(/찾을 수 없|종료한 방/.test(j.error||'')){ markClosed(H.code, j.closed); H={past:H.past||[]}; save(); room=null; render(); } return; }
+    if(!j.ok){ if(WATCH){ room=null; shown=''; vWatchGone(j.closed); return; } if(/찾을 수 없|종료한 방/.test(j.error||'')){ markClosed(H.code, j.closed); H={past:H.past||[]}; save(); room=null; render(); } return; }
     if(j.same){ runBots(room); return; } room=j.room; ver=room.ver; render(); runBots(room);
   }).catch(()=>setConn(false)).finally(()=>{ timer=setTimeout(poll, 2000); });
 }
+function vWatchGone(closed){ $app.innerHTML=`<div class="card stack" style="max-width:640px;margin:40px auto;text-align:center"><h2>👀 참관 모드</h2><p>${closed?'수업자가 이 방을 종료했습니다. 참관해 주셔서 감사합니다.':'방 '+esc(WATCH)+'을(를) 찾을 수 없습니다. 참관 링크의 방 코드를 확인해 주세요.'}</p></div>`; }
 function render(){
-  if(!room){ shown=''; return vSetup(); }
-  document.getElementById('who').textContent = ERA.title+' · 방 '+room.code+(room.cls?' · '+room.cls:'');
+  if(!room){ shown=''; if(WATCH){ $app.innerHTML='<p class="muted" style="text-align:center;margin:60px">수업 화면에 연결하는 중…</p>'; return; } return vSetup(); }
+  document.getElementById('who').textContent = (WATCH?'👀 참관 모드 · ':'')+ERA.title+' · 방 '+room.code+(room.cls?' · '+room.cls:'');
   const k=room.phase+':'+room.turn;
   if(k===shown){ live(); return; }
   shown=k;
@@ -88,27 +92,31 @@ function cmd(c, btn){
 }
 function alertBox(m){ const e=document.getElementById('hmsg'); if(e){ e.textContent=m; } }
 function ctlHTML(){
+  if(WATCH){ const n=room.teams.filter(t=>t.submitted).length, N=room.teams.length;
+    const ph={lobby:'의정부 입장 중', deciding:`사건 ${room.turn+1}/${ERA.turns.length} 논의 중 · 결정 상신 ${n}/${N}`, revealed:`사건 ${room.turn+1}/${ERA.turns.length} 결과 공개`, ended:'국정 회의 종료'}[room.phase];
+    return `<div class="row"><span class="pill navy" style="font-size:15px">👀 참관 모드</span><span class="pill" style="font-size:15px">${ph}</span><span class="small muted">수업자 화면과 같은 내용이 실시간으로 보입니다. 조작은 수업자만 할 수 있습니다.</span></div>`; }
   const n=room.teams.filter(t=>t.submitted).length, N=room.teams.length, P=room.teams.reduce((a,t)=>a+t.members.length,0);
   let left='', right='';
   if(room.phase==='lobby'){ left=`<span class="pill navy">의정부 ${N} · 학생 ${P}</span>${DEMO?`<button class="btn" data-act="bots">체험용 가상 의정부 3개 추가</button><a class="btn jade" href="index.html?room=${room.code}${DEMO?'&demo=1':''}" target="_blank" rel="noopener">학생 화면 열기(새 탭)</a>`:''}`; right=`<button class="btn primary big" data-cmd="open" ${N?'':'disabled'}>첫 사건 열기</button>`; }
   if(room.phase==='deciding'){ const sr=room.sur, rn=room.teams.filter(t=>t.responded).length;
     const sx = sr&&sr.id ? `<span class="pill bad" style="font-size:15px">돌발 「${esc(surpriseById(sr.id).title)}」 대응 ${rn}/${N}</span>`
       : `${sr&&sr.pending&&H.autoSur!==false?`<span class="small muted" id="surwait">돌발 이벤트 대기 중</span>`:''}<button class="btn" data-cmd="surprise">돌발 이벤트 일으키기</button>`;
-    left=`<span class="timer" id="timer">00:00</span><span class="pill ${n===N?'good':'navy'}" style="font-size:15px">결정 상신 ${n}/${N}</span>${sx}`;
+    left=`<span class="small muted">경과 <span id="timer">00:00</span></span><span class="pill ${n===N?'good':'navy'}" style="font-size:15px">결정 상신 ${n}/${N}</span>${sx}`;
     right=`<button class="btn primary big" data-cmd="reveal">${n<N?'결과 공개 ('+(N-n)+'곳 미상신)':'결과 공개'}</button>`; }
   if(room.phase==='revealed'){ const last=room.turn+1>=ERA.turns.length; left=`<span class="pill good" style="font-size:15px">사건 ${room.turn+1}/${ERA.turns.length} 결과</span>`;
     right=`<button class="btn primary big" data-cmd="open">${last?'최종 결과 보기':'다음 사건 열기'}</button>`; }
   if(room.phase==='ended'){ const f=room.teams.reduce((a,t)=>a+t.members.filter(m=>m.final).length,0); left=`<span class="pill navy" style="font-size:15px">성찰 제출 ${f}/${P}명</span>`; right=`<button class="btn" data-act="newroom">새 방 만들기</button>`; }
   const ex = DEMO||room.phase==='lobby' ? '' : `<button class="btn" data-act="export">기록 내려받기(엑셀)</button>`;
+  const wch = DEMO ? '' : `<button class="btn" data-act="watchlink" title="외부 참관 선생님에게 보낼 읽기 전용 화면 링크">👀 참관 링크</button>`;
   const dsh = DEMO ? '' : `<a class="btn" href="daesaheon.html?code=${room.code}" target="_blank" rel="noopener" title="별도의 컴퓨터나 창에 띄우는 AI 대사헌 음성 대화 화면">🎙 대사헌 화면</a>`;
   const endb = (room.phase==='deciding'||room.phase==='revealed' ? `<button class="btn" data-act="endask" style="border-color:var(--bad);color:var(--bad)">게임 끝내기</button>` : '')
     + `<button class="btn" data-act="closeask" data-code="${room.code}" data-key="${H.hostKey}" style="border-color:var(--bad);color:var(--bad)">방 종료</button>`;
-  return `<div class="row">${left}${ex}${dsh}<span class="small" id="hmsg" style="color:var(--bad)"></span></div><div class="row">${endb}${right}</div>`;
+  return `<div class="row">${left}${ex}${dsh}${wch}<span class="small" id="hmsg" style="color:var(--bad)"></span></div><div class="row">${endb}${right}</div>`;
 }
 function startTimer(){ clearInterval(tick); tick=setInterval(()=>{ const e=document.getElementById('timer'); if(!e||!room||!room.openedAt) return;
   const sec=Math.max(0,Math.floor((Date.now()-room.openedAt)/1000)); e.textContent=String(Math.floor(sec/60)).padStart(2,'0')+':'+String(sec%60).padStart(2,'0');
   // 돌발 이벤트 자동 발생: 사건을 연 뒤 서버가 정한 시간이 지나면
-  if(room.phase==='deciding' && room.sur && room.sur.pending && !surFiring && sec>=room.sur.delay){ surFiring=true; API.post({action:'host', code:H.code, hostKey:H.hostKey, cmd:'surprise'}).then(()=>{ ver=0; poll(); }).finally(()=>{ setTimeout(()=>surFiring=false, 4000); }); }
+  if(!WATCH && room.phase==='deciding' && room.sur && room.sur.pending && !surFiring && sec>=room.sur.delay){ surFiring=true; API.post({action:'host', code:H.code, hostKey:H.hostKey, cmd:'surprise'}).then(()=>{ ver=0; poll(); }).finally(()=>{ setTimeout(()=>surFiring=false, 4000); }); }
   }, 500); }
 let surFiring=false, surShown='';
 function surHostPop(){
@@ -229,8 +237,17 @@ function exportXlsx(code, key, btn){
 /* ---------- 이벤트 ---------- */
 document.addEventListener('click', e=>{
   const t=e.target.closest('[data-act],[data-cmd]'); if(!t||t.disabled) return;
+  if(WATCH && t.dataset.act!=='flipreal'){ e.preventDefault(); return; }
   if(t.dataset.cmd) return cmd(t.dataset.cmd, t);
   const a=t.dataset.act;
+  if(a==='watchlink'){ const u=watchUrl();
+    openModal(`<div class="mh"><div><small>외부 참관</small><h2>👀 참관 링크</h2></div><button class="x" data-close aria-label="닫기">✕</button></div>
+      <div class="mbody stack"><p>이 링크를 받은 선생님은 지금 교사 화면(의정부 현황, 타이머, 돌발 이벤트, 결과 인포그래픽, 순위)을 실시간으로 볼 수 있습니다. 버튼은 눌리지 않으며, 학생 개인 기록과 엑셀은 볼 수 없습니다.</p>
+      <input class="in" id="wurl" readonly value="${esc(u)}" style="font-size:15px" onclick="this.select()">
+      <p class="small muted" id="wmsg"></p></div>
+      <div class="mf"><button class="btn" data-close>닫기</button><button class="btn primary" type="button" id="wcopy">링크 복사</button></div>`);
+    setTimeout(()=>{ const b=document.getElementById('wcopy'); if(b) b.onclick=()=>{ const i=document.getElementById('wurl'); i.select(); (navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>{ document.getElementById('wmsg').textContent='복사했습니다. 메신저나 화상 회의 채팅에 붙여 넣으세요.'; }).catch(()=>{ try{ document.execCommand('copy'); document.getElementById('wmsg').textContent='복사했습니다.'; }catch(er){ document.getElementById('wmsg').textContent='링크를 길게 눌러 복사하세요.'; } }); }; }, 0);
+    return; }
   if(a==='closeask'){ const c=t.dataset.code, k=t.dataset.key, cur=room&&room.code===c;
     openModal(`<div class="mh"><div><small>방 종료</small><h2>방 ${esc(c)}을(를) 종료할까요?</h2></div><button class="x" data-close aria-label="닫기">✕</button></div>
       <div class="mbody"><p>종료하면 이 방에 접속한 학생 화면이 모두 끊기고, 이 방 코드로는 더 이상 들어올 수 없습니다.</p>${cur&&room.phase!=='ended'?'<p class="note">아직 성찰을 제출하지 않은 학생이 있다면 먼저 <b>게임 끝내기</b>로 성찰을 받은 뒤 종료하세요.</p>':''}<p class="small muted">지금까지의 기록은 30일 동안 보관되어 '지난 방 기록'에서 엑셀로 내려받을 수 있습니다. 종료한 방은 다시 열 수 없습니다.</p></div>
@@ -251,7 +268,12 @@ document.addEventListener('click', e=>{
   if(a==='newroom'){ H={past:H.past||[]}; save(); room=null; ver=0; render(); }
   if(a==='export'){ exportXlsx(t.dataset.code||H.code, t.dataset.key||H.hostKey, t); return; }
 });
+if(WATCH){ const sb=document.querySelector('header.top .sub'); if(sb) sb.textContent='참관 화면'; document.title='참관 · '+document.title; }
 render(); poll();
+
+cdInit(true, WATCH);
+document.addEventListener('click', e=>{ const b=e.target.closest('[data-tmr]'); if(!b||!room||WATCH) return;
+  b.disabled=true; API.post({action:'host', code:H.code, hostKey:H.hostKey, cmd:'timer', op:b.dataset.tmr}).then(j=>{ if(!j.ok) alertBox(j.error); ver=0; poll(); }).finally(()=>{ b.disabled=false; }); });
 </script>
 </body>
 </html>

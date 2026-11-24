@@ -490,3 +490,20 @@ button.sxopt{cursor:pointer} button.sxopt:hover{border-color:#8c2d1e}
 .qa-mic.on{background:#b23a2c; color:#fff; border-color:#b23a2c; animation:exPulse 1.2s infinite}
 .qa-end{display:flex; gap:8px; justify-content:flex-end; padding:8px 18px 16px}
 [hidden]{display:none!important}
+
+/* ── 의논 타이머 ── */
+.cdbar{background:#1f2a44; border-top:1px solid rgba(255,255,255,.12); color:#fff; box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.cdbar[hidden]{display:none}
+.cd-in{max-width:1240px; margin:0 auto; display:flex; align-items:center; gap:12px; padding:8px 18px; flex-wrap:wrap}
+.cd-ico{font-size:20px}
+.cd-lb{font-size:14px; opacity:.85}
+.cd-t{font-variant-numeric:tabular-nums; font-size:30px; letter-spacing:.04em; min-width:96px}
+.cdbar.host .cd-t{font-size:40px}
+.cd-track{flex:1; min-width:120px; height:10px; border-radius:99px; background:rgba(255,255,255,.18); overflow:hidden}
+.cd-track i{display:block; height:100%; background:#5fb39a; border-radius:99px; transition:width .25s linear}
+.cd-msg{font-size:14px; font-weight:700}
+.cd-btns{display:flex; gap:6px}
+.cd-btns .btn{padding:4px 10px; font-size:13px; background:rgba(255,255,255,.1); color:#fff; border-color:rgba(255,255,255,.35)}
+.cdbar.warn{background:#8a5a12} .cdbar.warn .cd-track i{background:#f3c35a}
+.cdbar.warn .cd-t{animation:exPulse 1s infinite}
+.cdbar.over{background:#9b2a2a} .cdbar.over .cd-track i{background:#fff}

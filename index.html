@@ -401,6 +401,7 @@ document.addEventListener('click', e=>{
   if(a==='copy'){ const m=document.getElementById('copied'), fb=()=>{ const b=document.getElementById('copybox'); b.hidden=false; b.select(); m.textContent='상자 내용을 직접 복사하세요.'; };
     try{ navigator.clipboard.writeText(reportText()).then(()=>{ m.textContent='복사했습니다.'; }, fb); }catch(err){ fb(); } return; }
 });
+cdInit(false);
 document.getElementById('leave').addEventListener('click',()=>{ if(confirm('이 방에서 나가고 새 방 코드를 입력할까요?')) leaveRoom(''); });
 render(); poll();
 </script>

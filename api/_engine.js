@@ -400,6 +400,7 @@ const ERA = {
 
 /* 돌발 이벤트: 정책 협의 도중 갑자기 일어나는 일. 모든 나라에 같은 일이 일어나고, 각 나라가 대응을 고른다.
  * ignore: 결과 공개 때까지 대응하지 않았을 때 */
+const DISCUSS_SEC = 300;     // 사건마다 모둠 의논 시간(초)
 const SURPRISE_RATE = 0.7;   // 사건마다 돌발 이벤트가 일어날 확률
 const SURPRISES = [
   {id:'drought', icon:'旱', title:'큰 가뭄', text:'석 달째 비가 내리지 않아 논바닥이 갈라졌습니다. 굶주린 백성들이 고을 관아 앞에 모여들고 있습니다.',
@@ -633,7 +634,7 @@ function canDecide(t, m) { return m.roles.indexOf('yeong') >= 0 || !hasRole(t, '
 
 function publicRoom(r) {
   return {
-    code: r.code, cls: r.cls, phase: r.phase, turn: r.turn, total: TOTAL, ver: r.ver, openedAt: r.openedAt || null,
+    code: r.code, cls: r.cls, phase: r.phase, turn: r.turn, total: TOTAL, ver: r.ver, openedAt: r.openedAt || null, tEnd: r.tEnd || null, now: Date.now(),
     sur: !r.sur ? null : r.sur.fired ? { id: r.sur.id, at: r.sur.at } : { pending: true, delay: r.sur.delay },
     teams: r.order.map(id => {
       const t = r.teams[id], g = t.game;
@@ -733,8 +734,18 @@ function handle(d) {
         else { r.turn++; r.phase = 'deciding'; }
       } else return { ok: false, error: '지금은 다음 단계로 넘어갈 수 없습니다.' };
       r.openedAt = Date.now();
+      r.tEnd = r.phase === 'deciding' ? r.openedAt + DISCUSS_SEC * 1000 : null;
       r.sur = null;
       if (r.phase === 'deciding') { r.order.forEach(id => { r.teams[id].sresp = null; }); if (Math.random() < SURPRISE_RATE) r.sur = pickSurprise(r); }
+      putRoom(r, true);
+      return { ok: true };
+    }
+    if (d.cmd === 'timer') {   // 의논 타이머: +1분 / -1분 / 다시 5분
+      if (r.phase !== 'deciding') return { ok: false, error: '논의 중일 때만 타이머를 바꿀 수 있습니다.' };
+      const now = Date.now(), base = Math.max(now, r.tEnd || now);
+      if (d.op === 'add') r.tEnd = base + 60000;
+      else if (d.op === 'sub') r.tEnd = Math.max(now, base - 60000);
+      else r.tEnd = now + DISCUSS_SEC * 1000;
       putRoom(r, true);
       return { ok: true };
     }
